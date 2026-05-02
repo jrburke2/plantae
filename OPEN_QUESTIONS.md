@@ -230,33 +230,167 @@ Code lands at `plant_sim/schema/scene.py` (new) during V2.2 implementation — P
 
 ---
 
-## Pending — Plant output and export schema (NEW 2026-05-02)
+## Plant output and export schema (RESOLVED 2026-05-02)
 
-Driven by F43–F47 in REQUIREMENTS, which add plant-material attributes and the export contract that hands off to procurement systems. Plantae-marketplace boundary now resolved (see RESOLVED section above). Outstanding sub-questions:
+Driven by F43–F47 in REQUIREMENTS, which add plant-material attributes and the export contract that hands off to procurement systems. Plantae↔marketplace boundary already resolved (S1). Resolutions below; YAML and JSON schema sketches at the end.
 
-**Q1: Plant material form enum, locked.**
-Initial set: `seed`, `plug`, `container_1gal`, `container_3gal`, `bare_root`, `B&B`, `bulb_corm_rhizome`, `cutting`. Open: do we need a `bareroot_grade` distinction (seedling vs liner vs landscape-size for woody species)? Probably yes for trees, no for forbs. Phase 1 lock the eight; revisit when `crown_tree` lands.
+**Q1: Plant material form enum.**
+Initial set: `seed`, `plug`, `container_1gal`, `container_3gal`, `bare_root`, `B&B`, `bulb_corm_rhizome`, `cutting`. Open question on whether woody species need a `bareroot_grade` distinction (seedling vs liner vs landscape-size).
+
+**Resolved:** Lock the eight forms in Phase 1. Revisit a `bareroot_grade` distinction when the `crown_tree` archetype lands (F6 in Phase 1+); woody species are the only place the distinction matters.
 
 **Q2: Allowed-form subset per species.**
-Some species don't tolerate certain forms (taproot species poorly bare-rooted, certain sedges plug-only). Schema needs `allowed_forms: [enum, ...]` per species, not just a single default. Default form per species is also useful (e.g., for *Andropogon gerardii* default to `seed` for restoration grade, `plug` for ornamental).
+Some species don't tolerate certain forms (taproot species poorly bare-rooted, certain sedges plug-only).
+
+**Resolved:** Species YAML gains `material.allowed_forms: [enum, ...]` (required, list, must be a non-empty subset of the canonical enum) and `material.default_form: <enum>` (required, must be in `allowed_forms`). One default per species — independent of grade. Per-row override available in scene YAML (`species_mix[i].form: "<form>"`); per-specimen override is YAGNI until a consumer asks.
 
 **Q3: BOM quantity semantics by form.**
-- Counts for transplants is straightforward. One *Quercus alba* B&B is one tree.
-- Seed needs more care: PLS lb/acre is the standard for restoration drills; broadcast rate may differ; ornamental seed may be sold by the packet/oz. The BOM should report the natural unit per form. Mixed-species seed mixes complicate this since the consumer typically wants total mix weight + per-species PLS percentages, not raw species weights.
-- Possible alternative-form reporting: when a scene calls for 5000 little bluestem, the BOM could surface `seed: X lb PLS` AND `plug: 5000 plugs` so the consumer picks based on availability and budget. Maybe a flag.
+Counts for transplants vs PLS lb for seed vs packet/oz for ornamental seed; mixed-species seed mixes are a separate concept.
+
+**Resolved:** One form per BOM row, the row's chosen form (species default unless scene-overridden). Quantity is `{value, unit}` with `unit` form-appropriate (closed enum below). Mixed-species seed mixes are a first-class artifact (see Seed mix design below) — not modeled by trying to pivot per-species rows. Alternative-form pivots ("could be 5000 plugs OR X lb seed") are a marketplace concern; plantae does not ship that complexity.
 
 **Q4: Export format.**
-- BOM canonical: JSON. Schema versioned. CSV adapter for spreadsheet users.
-- Scene artifact: JSON with embedded GeoJSON polygon + key-specimen feature collection + species mix and density spec. Suggested suffix `.plantae-scene.json`.
-- Versioning: every export carries `plantae_version`, `scene_schema_version`, `template_versions: {species: version, ...}` so a procurement consumer knows what it's looking at.
+- BOM canonical JSON, schema versioned. CSV adapter for spreadsheet users.
+- Scene artifact: previously open ("JSON with embedded GeoJSON, suggested suffix `.plantae-scene.json`"); now resolved against audit item (b).
+
+**Resolved:** **The scene YAML IS the scene artifact** — F46 collapses to "the export CLI passes the scene YAML through with version frontmatter, no new format." Resolves audit item (b) below. BOM is the only newly-defined export format; it lands as canonical JSON + CSV adapter. Every export carries `plantae_version` and `bom_schema_version` (or `scene_schema_version` on the passthrough YAML).
 
 **Q5: Substitution semantics.**
-Marketplace concept distinguishes restoration-grade from ornamental-grade. If a species in the BOM is unavailable from any supplier in the consumer's region, the marketplace may want to substitute. Substitution is a marketplace concern, but plantae's grade tag (F44) and provenance tag (F45) are the inputs. Consider whether plantae should also emit substitution hints (e.g., "if *Schizachyrium scoparium* is unavailable, accept *Andropogon gerardii*") or leave that purely to the marketplace.
+Whether plantae should emit substitution hints alongside the grade and provenance tags.
+
+**Resolved:** Substitution stays purely in marketplace logic (per S1). Plantae emits `grade` (F44) and `provenance` (F45) as inputs; no `substitution_hints` field on species or BOM rows.
 
 **Q6: Phase placement.**
-- F43, F44, F45 (species attributes) land in Phase 1 alongside the new archetypes — additive YAML schema work.
-- F46, F47, F53 (exports + CLI subcommand) land alongside the scene spec, V2.2 territory.
-- No marketplace-side work in plantae roadmap. The marketplace product owns its own roadmap.
+**Resolved:**
+- F43, F44, F45 (species attributes) land in Phase 1 — additive YAML schema work alongside new archetypes.
+- F46 (scene YAML passthrough w/ version frontmatter), F47 (BOM), F53 (`plant-sim export`) land in V2.2.
+- F57 (seed mix definitions, NEW; see below) lands in Phase 1 with the species attributes.
+- No marketplace-side work on plantae's roadmap.
+
+### Seed mix design (NEW)
+
+Restoration procurement is mix-first: contractors buy "25 lb of Tallgrass Prairie Mix at 30/25/20/15/5/5 percentages," not raw per-species weights. Mixes are a first-class artifact — distinct from per-species form metadata.
+
+**New artifact: reusable mix definitions** at `mixes/<mix_name>.yaml`:
+
+```yaml
+# mixes/tallgrass_prairie_mix.yaml
+name: "tallgrass_prairie_mix"
+display_name: "Tallgrass Prairie Mix"
+description: "Standard Midwest tallgrass restoration mix"
+grade: "restoration_grade"
+components:                                # weight_pct sums to 100 (schema validates)
+  - species: "andropogon_gerardii"
+    weight_pct: 30
+  - species: "schizachyrium_scoparium"
+    weight_pct: 25
+  - species: "sorghastrum_nutans"
+    weight_pct: 20
+  - species: "elymus_canadensis"
+    weight_pct: 15
+  - species: "rudbeckia_hirta"
+    weight_pct: 5
+  - species: "echinacea_pallida"
+    weight_pct: 5
+```
+
+**Scene YAML accepts mix entries alongside individual species entries:**
+
+```yaml
+species_mix:
+  - mix: "tallgrass_prairie_mix"
+    application_rate: {value: 8, unit: "lb_PLS_per_acre"}    # mix entries take rate, not density
+  - species: "echinacea_purpurea"
+    density_per_m2: 2
+    form: "plug"
+```
+
+**BOM JSON gets `row_type: mix` rows with components:**
+
+```json
+{
+  "plantae_version": "0.4.0",
+  "bom_schema_version": 1,
+  "scene_name": "prairie_demo",
+  "scene_seed": "PRAR-1234",
+  "rows": [
+    {
+      "row_type": "mix",
+      "mix_id": "tallgrass_prairie_mix",
+      "mix_display_name": "Tallgrass Prairie Mix",
+      "total_quantity": {"value": 4.0, "unit": "lb_PLS"},
+      "grade": ["restoration_grade"],
+      "components": [
+        {"species_canonical": "andropogon_gerardii",     "weight_pct": 30, "weight": {"value": 1.20, "unit": "lb_PLS"}},
+        {"species_canonical": "schizachyrium_scoparium", "weight_pct": 25, "weight": {"value": 1.00, "unit": "lb_PLS"}},
+        {"species_canonical": "sorghastrum_nutans",      "weight_pct": 20, "weight": {"value": 0.80, "unit": "lb_PLS"}},
+        {"species_canonical": "elymus_canadensis",       "weight_pct": 15, "weight": {"value": 0.60, "unit": "lb_PLS"}},
+        {"species_canonical": "rudbeckia_hirta",         "weight_pct": 5,  "weight": {"value": 0.20, "unit": "lb_PLS"}},
+        {"species_canonical": "echinacea_pallida",       "weight_pct": 5,  "weight": {"value": 0.20, "unit": "lb_PLS"}}
+      ]
+    },
+    {
+      "row_type": "species",
+      "species_canonical": "echinacea_purpurea",
+      "scientific_name": "Echinacea purpurea",
+      "form": "plug",
+      "quantity": {"value": 200, "unit": "count"},
+      "grade": ["restoration_grade", "ornamental_grade"],
+      "provenance": {"ecoregion": "EPA_L3_54", "origin_range": null},
+      "notes": null
+    }
+  ]
+}
+```
+
+**CSV adapter — flat with extra columns:**
+
+`scene_name, row_type, mix_id, mix_display_name, weight_pct, species_canonical, scientific_name, form, quantity_value, quantity_unit, grade, provenance_ecoregion, provenance_lat_min, provenance_lat_max, provenance_lon_min, provenance_lon_max, notes`
+
+- Mix summary row: `row_type=mix`, `form=seed_mix`, `mix_id` populated, `weight_pct` null, species columns null.
+- Mix component row: `row_type=mix_component`, `form=seed`, `mix_id` references parent, `weight_pct` populated, species columns populated.
+- Standalone species row: `row_type=species`, `mix_id` and `weight_pct` null.
+
+UTF-8 with header row. Per-species roll-ups across mix and standalone entries are a marketplace concern — plantae emits the structured BOM; consumer computes totals.
+
+**Mix validation rules:**
+- `components[].weight_pct` must sum to 100 (within float tolerance).
+- All component species must exist in `species/` and must include `seed` in their `allowed_forms`.
+- Mix grade must match every component species' grade compatibility.
+- `application_rate` unit is `lb_PLS_per_acre` for now; `g_per_m²` added when an ornamental use case asks.
+- A scene can mix mix entries and individual entries freely; no cross-validation between them.
+
+### Resolved gap fills
+
+- **Quantity unit enum:** `count` (transplants and cuttings), `lb_PLS` (restoration seed; Pure Live Seed pounds), `oz` (ornamental seed), `g` (small ornamental seed). Closed enum; add when a use case appears.
+- **Default form is per-species, not per-grade.** A species with both restoration and ornamental grade still has one `default_form`. Scene YAML overrides per row when a different form is desired.
+- **Versioning frontmatter on every export:** `plantae_version` always; `bom_schema_version` on the BOM file; `scene_schema_version` on the passthrough scene YAML.
+- **Export bundle layout** (output of `plant-sim export <scene>`):
+  ```
+  <output-dir>/
+  ├── <scene>.plantae-scene.yaml    # passthrough of input scene YAML + version frontmatter
+  ├── <scene>.bom.json              # canonical BOM
+  └── <scene>.bom.csv               # CSV adapter
+  ```
+
+### Species YAML — F43/F44/F45 additions sketch
+
+```yaml
+# species/asteraceae/echinacea_purpurea.yaml (excerpt)
+material:
+  allowed_forms: ["seed", "plug", "container_1gal", "bare_root"]
+  default_form: "plug"
+
+grade: ["restoration_grade", "ornamental_grade"]    # one or both
+
+provenance:
+  ecoregion: "EPA_L3_54"                            # Bailey or EPA L3/L4 code
+  origin_range:                                     # optional lat/lon bounding box
+    lat: [38.0, 44.0]
+    lon: [-92.0, -85.0]
+```
+
+Code lands at `plant_sim/schema/species.py` (existing — additive Pydantic fields) and a new `plant_sim/schema/mix.py` for mix definitions during Phase 1; BOM emitter and `plant-sim export` land in V2.2 (likely `plant_sim/export/bom.py`).
 
 ---
 
@@ -270,11 +404,11 @@ Currently parked at Phase 5+. P1 (deep usability at every facet) suggests earlie
 
 **Early read:** move F42 to Phase 3 alongside community rendering, since that's when scenes become a user-facing concept rather than a developer-facing one. Phase 5+ is the right slot only if early users will all be technical, which contradicts the design-to-procurement vision.
 
-### b. Scene artifact (F46) vs scene YAML (F36) duplication
+### b. Scene artifact (F46) vs scene YAML (F36) duplication (RESOLVED 2026-05-02)
 
-F46 describes a portable scene artifact distinct from `scenes/<scene_name>.yaml` in F36. P2 (minimum architectural complexity) suggests these may be the same artifact under two names. The YAML is already portable, diffable, versionable, and built on open formats (P6). A distinct "scene artifact" export with a separate format adds a schema layer that earns nothing the YAML doesn't already deliver. Counter: the YAML might evolve to carry developer-facing fields (template overrides, generator hints, debug annotations) that aren't appropriate for the procurement-side artifact; distinct schemas keep concerns separate.
+F46 originally described a portable scene artifact distinct from `scenes/<scene_name>.yaml` in F36. P2 (minimum architectural complexity) and P6 (open formats) flagged the duplication: the YAML is already portable, diffable, versionable, and built on open standards. A distinct "scene artifact" export with a separate format adds a schema layer that earns nothing the YAML doesn't already deliver. Counter considered: developer-facing fields (template overrides, generator hints, debug annotations) might warrant a separate procurement-side artifact.
 
-**Early read:** the YAML is the scene artifact at a single shared schema. F46 collapses to "CLI ergonomics around the YAML" rather than introducing a new artifact format. If developer-facing fields appear later, scope them with a `_dev` namespace inside the YAML, don't fork the format.
+**Resolved:** The scene YAML is the scene artifact at a single shared schema. F46 collapses to "scene YAML passthrough with version frontmatter" — the export CLI emits a copy of the scene YAML alongside the BOM, no new format. If developer-facing fields appear later, scope them with a `_dev` namespace inside the YAML rather than forking the format. Resolution co-decided with plant-output schema Q4 (see Resolved section above).
 
 ### c. Lstring caching priority
 
