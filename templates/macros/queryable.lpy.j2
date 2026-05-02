@@ -1,0 +1,33 @@
+{# Persistent-marker macros for queryable modules.
+
+Two patterns are supported, matching the two distinct dispatcher shapes
+discovered during the spikes:
+
+  one_shot(name, params_decl, args_only, children)
+    - Andropogon-style: the dispatcher fires ONCE, emits children, becomes
+      a frozen marker. Used for InfloHead, Tiller, Panicle.
+
+  Scape (and similar multi-iteration growers) cannot use a generic macro
+  because the production body has multiple branches (still-growing vs
+  done-growing). For those, write the persistent-marker logic inline:
+  add an `expanded` or `done` boolean parameter, guard with
+  `if done: produce <Name>(..., True)`, set `done=True` when the grower
+  finishes. See rosette_scape_composite.lpy.j2's Scape rule for the
+  worked example.
+
+Macro arguments:
+  name        : module name (string)
+  params_decl : declaration form, e.g. "t_birth, max_height"
+  args_only   : same params without type/default decoration, used in self-emit
+                (Phase 0 they are identical; kept as separate arg in case
+                Phase 1 adds typed declarations)
+  children    : space-separated module emissions, e.g.
+                "DiskFloret(t_birth, DISK_RADIUS_M, DISK_MAT) RayRing(RAY_COUNT, t_birth)"
+#}
+
+{% macro one_shot(name, params_decl, args_only, children) -%}
+{{ name }}({{ params_decl }}, expanded) :
+    if expanded:
+        produce {{ name }}({{ args_only }}, True)
+    produce {{ name }}({{ args_only }}, True) {{ children }}
+{%- endmacro %}
