@@ -1,0 +1,122 @@
+{
+  "leaf_mature_default": {
+    "type": "MeshStandardMaterial",
+    "color": "#3a6b40",
+    "roughness": 0.65,
+    "metalness": 0.0,
+    "side": "DoubleSide"
+  },
+  "leaf_mature_green": {
+    "type": "MeshStandardMaterial",
+    "color": "#3a6b40",
+    "roughness": 0.65,
+    "metalness": 0.0,
+    "side": "DoubleSide"
+  },
+  "leaf_glaucous": {
+    "type": "MeshStandardMaterial",
+    "color": "#7a8b75",
+    "roughness": 0.7,
+    "metalness": 0.0,
+    "side": "DoubleSide"
+  },
+  "leaf_seasonal_temperate": {
+    "type": "MeshStandardMaterial",
+    "color_curve": [
+      {"doy": 100, "color": "#a8c878"},
+      {"doy": 180, "color": "#3a6b40"},
+      {"doy": 260, "color": "#3a6b40"},
+      {"doy": 290, "color": "#b85a2c"},
+      {"doy": 310, "color": "#5a3a1c"}
+    ],
+    "roughness": 0.65,
+    "metalness": 0.0,
+    "side": "DoubleSide"
+  },
+  "petiole_green": {
+    "type": "MeshStandardMaterial",
+    "color": "#506b3e",
+    "roughness": 0.7,
+    "metalness": 0.0,
+    "side": "DoubleSide"
+  },
+  "culm_summer_green": {
+    "type": "MeshStandardMaterial",
+    "color_curve": [
+      {"doy": 100, "color": "#5e8a4a"},
+      {"doy": 220, "color": "#5e8a4a"},
+      {"doy": 280, "color": "#a89860"},
+      {"doy": 320, "color": "#b89968"}
+    ],
+    "roughness": 0.7,
+    "metalness": 0.0,
+    "side": "DoubleSide"
+  },
+  "culm_winter_straw": {
+    "type": "MeshStandardMaterial",
+    "color": "#b89968",
+    "roughness": 0.85,
+    "metalness": 0.0,
+    "side": "DoubleSide"
+  },
+  "ray_floret_default": {
+    "type": "MeshStandardMaterial",
+    "color": "#cf4f8f",
+    "roughness": 0.55,
+    "metalness": 0.0,
+    "side": "DoubleSide"
+  },
+  "ray_floret_purple": {
+    "type": "MeshStandardMaterial",
+    "color": "#cf4f8f",
+    "roughness": 0.55,
+    "metalness": 0.0,
+    "side": "DoubleSide"
+  },
+  "disk_floret_default": {
+    "type": "MeshStandardMaterial",
+    "color": "#a05a2c",
+    "roughness": 0.75,
+    "metalness": 0.0,
+    "side": "DoubleSide"
+  },
+  "disk_floret_brown": {
+    "type": "MeshStandardMaterial",
+    "color": "#a05a2c",
+    "roughness": 0.75,
+    "metalness": 0.0,
+    "side": "DoubleSide"
+  },
+  "panicle_default": {
+    "type": "MeshStandardMaterial",
+    "color": "#a87545",
+    "roughness": 0.7,
+    "metalness": 0.0,
+    "side": "DoubleSide"
+  },
+  "panicle_bronze": {
+    "type": "MeshStandardMaterial",
+    "color_curve": [
+      {"doy": 200, "color": "#b88e55"},
+      {"doy": 240, "color": "#a87545"},
+      {"doy": 320, "color": "#7a4f2e"}
+    ],
+    "roughness": 0.7,
+    "metalness": 0.0,
+    "side": "DoubleSide"
+  },
+  "crown_dark": {
+    "type": "MeshStandardMaterial",
+    "color": "#3a2c1a",
+    "roughness": 0.85,
+    "metalness": 0.0,
+    "side": "DoubleSide"
+  },
+  "default_brown": {
+    "type": "MeshStandardMaterial",
+    "color": "#5a3a1c",
+    "roughness": 0.8,
+    "metalness": 0.0,
+    "side": "DoubleSide"
+  }
+}

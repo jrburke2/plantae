@@ -1,0 +1,42 @@
+# Same Echinacea as the canonical species file, declared in centimeters.
+# Used to verify unit-system agnosticism.
+#
+# 24 in = 60.96 cm; 48 in = 121.92 cm; etc.
+# Round to whole cm; the test allows for precision drift.
+
+scientific_name: Echinacea purpurea
+common_name: purple coneflower
+family: Asteraceae
+archetype: rosette_scape_composite
+growth_form: herbaceous_perennial
+
+units:
+  length: cm
+
+height_range: [61, 122]
+crown_width: [30, 61]
+
+habitat:
+  primary: [mesic_prairie]
+  cc_value: 5
+
+references:
+  - "test"
+
+phenology:
+  leaf_flush_doy: 105
+  peak_doy: 180
+  senescence_onset_doy: 275
+  abscission_doy: 315
+
+parameters:
+  rosette:
+    leaf_count_range: [6, 14]
+    leaf_length_range: [10, 20]
+    petiole_length_range: [2.5, 7.5]
+  scape:
+    count_range: [1, 5]
+    height_range: [61, 122]
+  inflorescence:
+    diameter: [7.6, 10.2]
+    ray_count_range: [13, 21]

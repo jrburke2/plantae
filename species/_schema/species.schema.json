@@ -1,0 +1,803 @@
+{
+  "$defs": {
+    "ClumpParams": {
+      "additionalProperties": false,
+      "properties": {
+        "tiller_count": {
+          "description": "Mature tiller count in the clump.",
+          "minimum": 1,
+          "title": "Tiller Count",
+          "type": "integer"
+        },
+        "tiller_height_range": {
+          "description": "Min and max flowering-tiller height in declared length units.",
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            }
+          ],
+          "title": "Tiller Height Range",
+          "type": "array"
+        },
+        "fraction_flowering": {
+          "description": "Fraction of tillers that flower (0..1). Andropogon mature: ~0.3.",
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Fraction Flowering",
+          "type": "number"
+        },
+        "vegetative_height_fraction": {
+          "default": 0.6,
+          "description": "Vegetative tiller height as a fraction of flowering tiller height.",
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Vegetative Height Fraction",
+          "type": "number"
+        },
+        "queryable": {
+          "default": true,
+          "description": "Persistent-marker pattern for the Clump module.",
+          "title": "Queryable",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "tiller_count",
+        "tiller_height_range",
+        "fraction_flowering"
+      ],
+      "title": "ClumpParams",
+      "type": "object"
+    },
+    "CustomLengthUnit": {
+      "additionalProperties": false,
+      "description": "Inline definition of a length unit the species YAML wants to use.\n\nExample:\n    units:\n      length:\n        name: foo_units\n        meters_per_unit: 0.42",
+      "properties": {
+        "name": {
+          "description": "Display name for the unit.",
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "meters_per_unit": {
+          "description": "Conversion factor: 1 unit = N meters. Must be > 0.",
+          "exclusiveMinimum": 0,
+          "title": "Meters Per Unit",
+          "type": "number"
+        }
+      },
+      "required": [
+        "name",
+        "meters_per_unit"
+      ],
+      "title": "CustomLengthUnit",
+      "type": "object"
+    },
+    "GrowthForm": {
+      "enum": [
+        "herbaceous_perennial",
+        "perennial_grass",
+        "annual",
+        "biennial",
+        "shrub",
+        "tree",
+        "vine"
+      ],
+      "title": "GrowthForm",
+      "type": "string"
+    },
+    "Habitat": {
+      "additionalProperties": false,
+      "properties": {
+        "primary": {
+          "description": "Primary habitat associations (e.g. mesic_prairie, oak_savanna). At least one required.",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Primary",
+          "type": "array"
+        },
+        "secondary": {
+          "description": "Optional secondary habitat associations.",
+          "items": {
+            "type": "string"
+          },
+          "title": "Secondary",
+          "type": "array"
+        },
+        "cc_value": {
+          "description": "Coefficient of Conservatism, 0-10 (Wilhelm 2017). Higher = more conservative / habitat-specialist.",
+          "maximum": 10,
+          "minimum": 0,
+          "title": "Cc Value",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "primary",
+        "cc_value"
+      ],
+      "title": "Habitat",
+      "type": "object"
+    },
+    "InflorescenceParams": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "default": "composite_head",
+          "description": "Inflorescence morphology category.",
+          "enum": [
+            "composite_head",
+            "raceme",
+            "panicle",
+            "spike",
+            "umbel",
+            "corymb",
+            "cyme"
+          ],
+          "title": "Type",
+          "type": "string"
+        },
+        "diameter": {
+          "description": "Min and max inflorescence diameter in declared length units.",
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            }
+          ],
+          "title": "Diameter",
+          "type": "array"
+        },
+        "ray_count_range": {
+          "description": "Min and max number of ray florets (composite heads).",
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "integer"
+            }
+          ],
+          "title": "Ray Count Range",
+          "type": "array"
+        },
+        "ray_droop": {
+          "default": false,
+          "description": "True if ray florets droop downward (e.g. Echinacea, Rudbeckia).",
+          "title": "Ray Droop",
+          "type": "boolean"
+        },
+        "queryable": {
+          "default": true,
+          "description": "Persistent-marker pattern for Inflorescence modules.",
+          "title": "Queryable",
+          "type": "boolean"
+        },
+        "ray_material_id": {
+          "default": "ray_floret_default",
+          "description": "Material library id for ray florets.",
+          "title": "Ray Material Id",
+          "type": "string"
+        },
+        "disk_material_id": {
+          "default": "disk_floret_default",
+          "description": "Material library id for the central disk.",
+          "title": "Disk Material Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "diameter",
+        "ray_count_range"
+      ],
+      "title": "InflorescenceParams",
+      "type": "object"
+    },
+    "PanicleParams": {
+      "additionalProperties": false,
+      "properties": {
+        "raceme_count_range": {
+          "description": "Min and max racemes per panicle ('turkey foot' for Andropogon: 2-5).",
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "integer"
+            }
+          ],
+          "title": "Raceme Count Range",
+          "type": "array"
+        },
+        "raceme_length": {
+          "description": "Raceme length in declared length units.",
+          "exclusiveMinimum": 0,
+          "title": "Raceme Length",
+          "type": "number"
+        },
+        "raceme_divergence_deg": {
+          "default": 35.0,
+          "description": "Angle from culm vertical at which racemes diverge.",
+          "maximum": 180,
+          "minimum": 0,
+          "title": "Raceme Divergence Deg",
+          "type": "number"
+        },
+        "queryable": {
+          "default": true,
+          "description": "Persistent-marker pattern for Panicle modules.",
+          "title": "Queryable",
+          "type": "boolean"
+        },
+        "material_id": {
+          "default": "panicle_default",
+          "description": "Material library id for the panicle.",
+          "title": "Material Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "raceme_count_range",
+        "raceme_length"
+      ],
+      "title": "PanicleParams",
+      "type": "object"
+    },
+    "Phenology": {
+      "additionalProperties": false,
+      "properties": {
+        "leaf_flush_doy": {
+          "description": "Day-of-year when leaves emerge (post-dormancy).",
+          "maximum": 366,
+          "minimum": 1,
+          "title": "Leaf Flush Doy",
+          "type": "integer"
+        },
+        "peak_doy": {
+          "description": "Day-of-year of peak vegetative growth.",
+          "maximum": 366,
+          "minimum": 1,
+          "title": "Peak Doy",
+          "type": "integer"
+        },
+        "senescence_onset_doy": {
+          "description": "Day-of-year when senescence begins (color change, leaf decline).",
+          "maximum": 366,
+          "minimum": 1,
+          "title": "Senescence Onset Doy",
+          "type": "integer"
+        },
+        "abscission_doy": {
+          "description": "Day-of-year when leaves drop / above-ground biomass dies back.",
+          "maximum": 366,
+          "minimum": 1,
+          "title": "Abscission Doy",
+          "type": "integer"
+        },
+        "inflorescence_emerge_doy": {
+          "anyOf": [
+            {
+              "maximum": 366,
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Day-of-year when inflorescence first appears. Optional for non-flowering archetypes.",
+          "title": "Inflorescence Emerge Doy"
+        },
+        "inflorescence_peak_doy": {
+          "anyOf": [
+            {
+              "maximum": 366,
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Day-of-year of peak bloom. Optional.",
+          "title": "Inflorescence Peak Doy"
+        },
+        "inflorescence_senescence_doy": {
+          "anyOf": [
+            {
+              "maximum": 366,
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Day-of-year when bloom ends. Optional.",
+          "title": "Inflorescence Senescence Doy"
+        },
+        "inflorescence_persist_winter": {
+          "default": false,
+          "description": "True if dried inflorescence remains visible into winter (e.g. Echinacea cones).",
+          "title": "Inflorescence Persist Winter",
+          "type": "boolean"
+        },
+        "culm_persist_winter": {
+          "default": false,
+          "description": "True if grass culm/stem remains standing into winter (e.g. Andropogon, Sorghastrum).",
+          "title": "Culm Persist Winter",
+          "type": "boolean"
+        },
+        "fruit_persist": {
+          "default": false,
+          "description": "True if fruits remain on the plant beyond seed dispersal.",
+          "title": "Fruit Persist",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "leaf_flush_doy",
+        "peak_doy",
+        "senescence_onset_doy",
+        "abscission_doy"
+      ],
+      "title": "Phenology",
+      "type": "object"
+    },
+    "Phyllotaxis": {
+      "enum": [
+        "spiral",
+        "distichous",
+        "opposite",
+        "whorled"
+      ],
+      "title": "Phyllotaxis",
+      "type": "string"
+    },
+    "RosetteParams": {
+      "additionalProperties": false,
+      "properties": {
+        "leaf_count_range": {
+          "description": "Min and max number of basal leaves in the rosette. Stochastic per specimen.",
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "integer"
+            }
+          ],
+          "title": "Leaf Count Range",
+          "type": "array"
+        },
+        "leaf_template": {
+          "default": "lanceolate",
+          "description": "Leaf shape template id (e.g. lanceolate, lanceolate_serrate, ovate).",
+          "title": "Leaf Template",
+          "type": "string"
+        },
+        "leaf_length_range": {
+          "description": "Min and max blade length in the species' declared length unit. Stochastic per specimen.",
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            }
+          ],
+          "title": "Leaf Length Range",
+          "type": "array"
+        },
+        "petiole_length_range": {
+          "anyOf": [
+            {
+              "maxItems": 2,
+              "minItems": 2,
+              "prefixItems": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                }
+              ],
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional min and max petiole length in declared length units. Omit for sessile leaves.",
+          "title": "Petiole Length Range"
+        },
+        "phyllotaxis": {
+          "$ref": "#/$defs/Phyllotaxis",
+          "default": "spiral",
+          "description": "Leaf arrangement: spiral, distichous (alternate 180), opposite, whorled."
+        },
+        "divergence_angle_deg": {
+          "default": 137.5,
+          "description": "Phyllotaxy divergence angle in degrees. 137.5 = golden angle (most spirals).",
+          "maximum": 360,
+          "minimum": 0,
+          "title": "Divergence Angle Deg",
+          "type": "number"
+        },
+        "queryable": {
+          "default": true,
+          "description": "If true, codegen injects the persistent-marker pattern so RosetteLeaf modules survive in the lstring as queryable markers.",
+          "title": "Queryable",
+          "type": "boolean"
+        },
+        "material_id": {
+          "default": "leaf_mature_default",
+          "description": "Material library id used for rosette leaves. See materials/library.json.",
+          "title": "Material Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "leaf_count_range",
+        "leaf_length_range"
+      ],
+      "title": "RosetteParams",
+      "type": "object"
+    },
+    "RosetteScapeCompositeParameters": {
+      "additionalProperties": false,
+      "properties": {
+        "rosette": {
+          "$ref": "#/$defs/RosetteParams"
+        },
+        "scape": {
+          "$ref": "#/$defs/ScapeParams"
+        },
+        "inflorescence": {
+          "$ref": "#/$defs/InflorescenceParams"
+        }
+      },
+      "required": [
+        "rosette",
+        "scape",
+        "inflorescence"
+      ],
+      "title": "RosetteScapeCompositeParameters",
+      "type": "object"
+    },
+    "ScapeParams": {
+      "additionalProperties": false,
+      "properties": {
+        "count_range": {
+          "description": "Min and max number of scapes per specimen.",
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "integer"
+            }
+          ],
+          "title": "Count Range",
+          "type": "array"
+        },
+        "height_range": {
+          "description": "Min and max scape height in declared length units.",
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            }
+          ],
+          "title": "Height Range",
+          "type": "array"
+        },
+        "branching": {
+          "default": "simple",
+          "description": "Scape branching pattern.",
+          "enum": [
+            "simple",
+            "branched"
+          ],
+          "title": "Branching",
+          "type": "string"
+        },
+        "leaf_count_on_scape": {
+          "default": [
+            0,
+            0
+          ],
+          "description": "Min and max cauline leaves on scape (0 if scape is leafless).",
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "integer"
+            }
+          ],
+          "title": "Leaf Count On Scape",
+          "type": "array"
+        },
+        "queryable": {
+          "default": true,
+          "description": "Persistent-marker pattern for Scape modules.",
+          "title": "Queryable",
+          "type": "boolean"
+        },
+        "material_id": {
+          "default": "culm_summer_green",
+          "description": "Material library id used for the scape stem.",
+          "title": "Material Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "count_range",
+        "height_range"
+      ],
+      "title": "ScapeParams",
+      "type": "object"
+    },
+    "TillerClumpParameters": {
+      "additionalProperties": false,
+      "properties": {
+        "clump": {
+          "$ref": "#/$defs/ClumpParams"
+        },
+        "tiller": {
+          "$ref": "#/$defs/TillerParams"
+        },
+        "panicle": {
+          "$ref": "#/$defs/PanicleParams"
+        }
+      },
+      "required": [
+        "clump",
+        "tiller",
+        "panicle"
+      ],
+      "title": "TillerClumpParameters",
+      "type": "object"
+    },
+    "TillerParams": {
+      "additionalProperties": false,
+      "properties": {
+        "leaf_count_range": {
+          "description": "Min and max leaves per tiller. Stochastic per tiller.",
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "integer"
+            }
+          ],
+          "title": "Leaf Count Range",
+          "type": "array"
+        },
+        "phyllotaxy_deg": {
+          "default": 180.0,
+          "description": "Distichous grasses: 180. Spiral: 137.5.",
+          "maximum": 360,
+          "minimum": 0,
+          "title": "Phyllotaxy Deg",
+          "type": "number"
+        },
+        "queryable": {
+          "default": true,
+          "description": "Persistent-marker pattern for Tiller modules so each is queryable.",
+          "title": "Queryable",
+          "type": "boolean"
+        },
+        "leaf_material_id": {
+          "default": "leaf_mature_default",
+          "description": "Material library id for grass blades.",
+          "title": "Leaf Material Id",
+          "type": "string"
+        },
+        "culm_material_id": {
+          "default": "culm_summer_green",
+          "description": "Material library id for the culm.",
+          "title": "Culm Material Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "leaf_count_range"
+      ],
+      "title": "TillerParams",
+      "type": "object"
+    },
+    "UnitSystem": {
+      "additionalProperties": false,
+      "description": "Per-species unit declaration.\n\nDefault is imperial inches, matching the USA-centric reference YAMLs\nin the design doc. Override per species.",
+      "properties": {
+        "length": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "$ref": "#/$defs/CustomLengthUnit"
+            }
+          ],
+          "default": "in",
+          "description": "Length unit used for all length-typed fields in this species YAML.",
+          "title": "Length"
+        },
+        "angle": {
+          "const": "deg",
+          "default": "deg",
+          "title": "Angle",
+          "type": "string"
+        },
+        "calendar": {
+          "const": "doy",
+          "default": "doy",
+          "title": "Calendar",
+          "type": "string"
+        }
+      },
+      "title": "UnitSystem",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "A single species archetype + parameters. The contributor surface.",
+  "properties": {
+    "scientific_name": {
+      "description": "Binomial scientific name (e.g. 'Echinacea purpurea').",
+      "minLength": 1,
+      "title": "Scientific Name",
+      "type": "string"
+    },
+    "common_name": {
+      "description": "Vernacular common name.",
+      "minLength": 1,
+      "title": "Common Name",
+      "type": "string"
+    },
+    "family": {
+      "description": "Botanical family (e.g. Asteraceae, Poaceae).",
+      "minLength": 1,
+      "title": "Family",
+      "type": "string"
+    },
+    "archetype": {
+      "description": "Morphological archetype that selects the .lpy template. Phase 0 supports: rosette_scape_composite, tiller_clump.",
+      "enum": [
+        "rosette_scape_composite",
+        "tiller_clump"
+      ],
+      "title": "Archetype",
+      "type": "string"
+    },
+    "growth_form": {
+      "$ref": "#/$defs/GrowthForm",
+      "description": "High-level growth-form category."
+    },
+    "units": {
+      "$ref": "#/$defs/UnitSystem",
+      "description": "Unit system for length values in this YAML. Default: imperial inches."
+    },
+    "height_range": {
+      "description": "Mature plant height range in declared length units.",
+      "maxItems": 2,
+      "minItems": 2,
+      "prefixItems": [
+        {
+          "type": "number"
+        },
+        {
+          "type": "number"
+        }
+      ],
+      "title": "Height Range",
+      "type": "array"
+    },
+    "crown_width": {
+      "description": "Mature crown width range in declared length units.",
+      "maxItems": 2,
+      "minItems": 2,
+      "prefixItems": [
+        {
+          "type": "number"
+        },
+        {
+          "type": "number"
+        }
+      ],
+      "title": "Crown Width",
+      "type": "array"
+    },
+    "habitat": {
+      "$ref": "#/$defs/Habitat"
+    },
+    "references": {
+      "description": "Bibliographic references supporting the parameter values.",
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "References",
+      "type": "array"
+    },
+    "phenology": {
+      "$ref": "#/$defs/Phenology"
+    },
+    "parameters": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/RosetteScapeCompositeParameters"
+        },
+        {
+          "$ref": "#/$defs/TillerClumpParameters"
+        }
+      ],
+      "description": "Archetype-specific parameter block. Schema dispatched on `archetype`.",
+      "title": "Parameters"
+    },
+    "template_override": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Optional escape hatch: relative path to a custom .lpy.j2 template to use instead of the archetype default. Use only when the standard archetype template doesn't fit. Most species leave this null.",
+      "title": "Template Override"
+    }
+  },
+  "required": [
+    "scientific_name",
+    "common_name",
+    "family",
+    "archetype",
+    "growth_form",
+    "height_range",
+    "crown_width",
+    "habitat",
+    "references",
+    "phenology",
+    "parameters"
+  ],
+  "title": "Species",
+  "type": "object"
+}

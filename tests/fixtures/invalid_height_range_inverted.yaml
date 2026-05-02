@@ -1,0 +1,30 @@
+# Invalid: height_range min > max.
+scientific_name: Echinacea purpurea
+common_name: purple coneflower
+family: Asteraceae
+archetype: rosette_scape_composite
+growth_form: herbaceous_perennial
+units:
+  length: in
+height_range: [48, 24]   # inverted
+crown_width: [12, 24]
+habitat:
+  primary: [mesic_prairie]
+  cc_value: 5
+references:
+  - test
+phenology:
+  leaf_flush_doy: 105
+  peak_doy: 180
+  senescence_onset_doy: 275
+  abscission_doy: 315
+parameters:
+  rosette:
+    leaf_count_range: [6, 14]
+    leaf_length_range: [4, 8]
+  scape:
+    count_range: [1, 5]
+    height_range: [24, 48]
+  inflorescence:
+    diameter: [3, 4]
+    ray_count_range: [13, 21]

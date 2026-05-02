@@ -1,0 +1,55 @@
+# yaml-language-server: $schema=../_schema/species.schema.json
+#
+# Andropogon gerardii (big bluestem).
+# Reference species for the tiller_clump archetype.
+
+scientific_name: Andropogon gerardii
+common_name: big bluestem
+family: Poaceae
+archetype: tiller_clump
+growth_form: perennial_grass
+
+units:
+  length: in
+
+height_range: [60, 84]
+crown_width: [12, 36]
+
+habitat:
+  primary: [mesic_prairie, dry-mesic_prairie]
+  secondary: [wet-mesic_prairie, savanna]
+  cc_value: 5
+
+references:
+  - "Wilhelm, G.S. and Rericha, L. 2017. Flora of the Chicago Region."
+
+phenology:
+  leaf_flush_doy: 110
+  peak_doy: 200
+  senescence_onset_doy: 270
+  abscission_doy: 320
+  inflorescence_emerge_doy: 200
+  inflorescence_peak_doy: 230
+  inflorescence_senescence_doy: 280
+  culm_persist_winter: true
+  inflorescence_persist_winter: true
+
+parameters:
+  clump:
+    tiller_count: 20
+    tiller_height_range: [60, 84]
+    fraction_flowering: 0.3
+    vegetative_height_fraction: 0.6
+    queryable: true
+  tiller:
+    leaf_count_range: [4, 7]
+    phyllotaxy_deg: 180.0
+    queryable: true
+    leaf_material_id: leaf_mature_green
+    culm_material_id: culm_summer_green
+  panicle:
+    raceme_count_range: [2, 5]
+    raceme_length: 4.0
+    raceme_divergence_deg: 35.0
+    queryable: true
+    material_id: panicle_bronze

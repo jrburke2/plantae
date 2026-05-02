@@ -1,0 +1,64 @@
+# yaml-language-server: $schema=../_schema/species.schema.json
+#
+# Echinacea purpurea (purple coneflower).
+# Reference species for the rosette_scape_composite archetype.
+# Generate the schema file with: plant-sim schema-json -o species/_schema/species.schema.json
+
+scientific_name: Echinacea purpurea
+common_name: purple coneflower
+family: Asteraceae
+archetype: rosette_scape_composite
+growth_form: herbaceous_perennial
+
+# Length unit declaration. Built-ins: m, cm, mm, in, ft, yd.
+# For a unit not listed, use {name: ..., meters_per_unit: ...} inline,
+# or call register_length_unit(...) before loading. Defaults to "in".
+units:
+  length: in
+
+height_range: [24, 48]
+crown_width: [12, 24]
+
+habitat:
+  primary: [mesic_prairie, dry-mesic_prairie]
+  secondary: [savanna, garden]
+  cc_value: 5
+
+references:
+  - "Wilhelm, G.S. and Rericha, L. 2017. Flora of the Chicago Region."
+
+phenology:
+  leaf_flush_doy: 105
+  peak_doy: 180
+  senescence_onset_doy: 275
+  abscission_doy: 315
+  inflorescence_emerge_doy: 175
+  inflorescence_peak_doy: 200
+  inflorescence_senescence_doy: 245
+  inflorescence_persist_winter: true
+
+parameters:
+  rosette:
+    leaf_count_range: [6, 14]
+    leaf_template: lanceolate_serrate
+    leaf_length_range: [4, 8]
+    petiole_length_range: [1, 3]
+    phyllotaxis: spiral
+    divergence_angle_deg: 137.5
+    queryable: true
+    material_id: leaf_mature_green
+  scape:
+    count_range: [1, 5]
+    height_range: [24, 48]
+    branching: simple
+    leaf_count_on_scape: [2, 4]
+    queryable: true
+    material_id: culm_summer_green
+  inflorescence:
+    type: composite_head
+    diameter: [3, 4]
+    ray_count_range: [13, 21]
+    ray_droop: true
+    queryable: true
+    ray_material_id: ray_floret_purple
+    disk_material_id: disk_floret_brown

@@ -1,0 +1,43 @@
+# Echinacea declared in a hypothetical custom length unit.
+# Used to verify the inline custom-unit extension point.
+#
+# Defined: 1 hand = 0.1016 m  (= 4 inches), so values here equal 6 inches in
+# canonical meters when divided by the original /4.
+
+scientific_name: Echinacea purpurea
+common_name: purple coneflower
+family: Asteraceae
+archetype: rosette_scape_composite
+growth_form: herbaceous_perennial
+
+units:
+  length:
+    name: hand
+    meters_per_unit: 0.1016
+
+height_range: [6, 12]
+crown_width: [3, 6]
+
+habitat:
+  primary: [mesic_prairie]
+  cc_value: 5
+
+references:
+  - "test"
+
+phenology:
+  leaf_flush_doy: 105
+  peak_doy: 180
+  senescence_onset_doy: 275
+  abscission_doy: 315
+
+parameters:
+  rosette:
+    leaf_count_range: [6, 14]
+    leaf_length_range: [1, 2]
+  scape:
+    count_range: [1, 5]
+    height_range: [6, 12]
+  inflorescence:
+    diameter: [0.75, 1.0]
+    ray_count_range: [13, 21]

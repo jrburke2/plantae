@@ -1,0 +1,22 @@
+# Invalid: archetype not yet implemented in Phase 0.
+scientific_name: Quercus macrocarpa
+common_name: bur oak
+family: Fagaceae
+archetype: crown_tree    # not yet supported in Phase 0
+growth_form: tree
+units:
+  length: in
+height_range: [600, 1000]
+crown_width: [400, 800]
+habitat:
+  primary: [oak_savanna]
+  cc_value: 5
+references:
+  - test
+phenology:
+  leaf_flush_doy: 110
+  peak_doy: 200
+  senescence_onset_doy: 270
+  abscission_doy: 320
+parameters:
+  whatever: stuff
