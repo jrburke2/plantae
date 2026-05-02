@@ -40,6 +40,7 @@ from plant_sim.codegen.generator import load_species, write as codegen_write
 from plant_sim.render.derive import derive
 from plant_sim.render.export import ExportError, export_to_obj_with_sidecar
 from plant_sim.schema.render_context import RenderContext
+from plant_sim.schema.seed import Seed
 
 # L-Py + boost::python is NOT thread-safe: concurrent Lsystem() calls from
 # multiple threads abort with `libc++abi: terminating due to uncaught exception
@@ -56,9 +57,9 @@ GENERATED_DIR = REPO_ROOT / "generated"
 MATERIALS_DIR = REPO_ROOT / "materials"
 VIEWER_DIR = REPO_ROOT / "viewer"
 
-# (species_id, seed) -> (Lsystem, lstring).
+# (species_id, canonical_seed_str) -> (Lsystem, lstring).
 # Module-level so it survives across requests in a single uvicorn worker.
-_DERIVED_CACHE: dict[tuple[str, int], tuple[Any, Any]] = {}
+_DERIVED_CACHE: dict[tuple[str, str], tuple[Any, Any]] = {}
 
 
 def _find_species_yaml(species_id: str) -> Path:
@@ -73,9 +74,16 @@ def _find_species_yaml(species_id: str) -> Path:
     return matches[0]
 
 
-def _ensure_derived(species_id: str, seed: int) -> tuple[Any, Any]:
+def _parse_seed(raw: str) -> Seed:
+    try:
+        return Seed(raw)
+    except (ValueError, TypeError) as e:
+        raise HTTPException(400, f"invalid seed {raw!r}: {e}")
+
+
+def _ensure_derived(species_id: str, seed: Seed) -> tuple[Any, Any]:
     """Return cached (Lsystem, lstring); derive on first call for this (species, seed)."""
-    key = (species_id, seed)
+    key = (species_id, seed.canonical())
     if key not in _DERIVED_CACHE:
         sp_yaml = _find_species_yaml(species_id)
         sp = load_species(sp_yaml)
@@ -85,13 +93,13 @@ def _ensure_derived(species_id: str, seed: int) -> tuple[Any, Any]:
     return _DERIVED_CACHE[key]
 
 
-def _render_paths(species_id: str, seed: int, t_doy: int) -> tuple[Path, Path]:
-    obj_path = OUTPUT_DIR / f"{species_id}_seed_{seed}_t{t_doy:03d}.obj"
+def _render_paths(species_id: str, seed: Seed, t_doy: int) -> tuple[Path, Path]:
+    obj_path = OUTPUT_DIR / f"{species_id}_seed_{seed.canonical()}_t{t_doy:03d}.obj"
     sidecar_path = obj_path.with_suffix(".materials.json")
     return obj_path, sidecar_path
 
 
-def _ensure_rendered(species_id: str, seed: int, t_doy: int) -> tuple[Path, Path]:
+def _ensure_rendered(species_id: str, seed: Seed, t_doy: int) -> tuple[Path, Path]:
     """Render OBJ + sidecar fresh on every call (per kickoff §10).
 
     The lstring cache in `_ensure_derived` provides the real speedup —
@@ -105,7 +113,11 @@ def _ensure_rendered(species_id: str, seed: int, t_doy: int) -> tuple[Path, Path
     try:
         export_to_obj_with_sidecar(
             lsys, lstring, float(t_doy), obj_path,
-            sidecar_meta={"species": species_id, "seed": seed},
+            sidecar_meta={
+                "species": species_id,
+                "seed": seed.canonical(),
+                "seed_display": seed.display(),
+            },
         )
     except ExportError as e:
         raise HTTPException(500, f"export failed: {e}")
@@ -120,31 +132,45 @@ def reset_cache() -> None:
 def make_app() -> FastAPI:
     app = FastAPI(title="plant_sim dev server", version="0.0.1")
 
-    def _validate_request(seed: int, t: float) -> int:
+    def _validate_request(t: float) -> int:
         t_doy = int(t)
         if not (1 <= t_doy <= 366):
             raise HTTPException(400, f"t out of range 1..366: {t_doy}")
-        if seed < 0:
-            raise HTTPException(400, f"seed must be non-negative: {seed}")
         return t_doy
 
     @app.get("/render/scene.obj")
-    async def render_obj(species: str, seed: int = 42, t: float = 200.0):
-        t_doy = _validate_request(seed, t)
+    async def render_obj(species: str, seed: str = "42", t: float = 200.0):
+        t_doy = _validate_request(t)
+        seed_obj = _parse_seed(seed)
         loop = asyncio.get_running_loop()
         obj_path, _ = await loop.run_in_executor(
-            _LPY_EXECUTOR, _ensure_rendered, species, seed, t_doy,
+            _LPY_EXECUTOR, _ensure_rendered, species, seed_obj, t_doy,
         )
         return FileResponse(obj_path, media_type="text/plain")
 
     @app.get("/render/scene.materials.json")
-    async def render_sidecar(species: str, seed: int = 42, t: float = 200.0):
-        t_doy = _validate_request(seed, t)
+    async def render_sidecar(species: str, seed: str = "42", t: float = 200.0):
+        t_doy = _validate_request(t)
+        seed_obj = _parse_seed(seed)
         loop = asyncio.get_running_loop()
         _, sidecar_path = await loop.run_in_executor(
-            _LPY_EXECUTOR, _ensure_rendered, species, seed, t_doy,
+            _LPY_EXECUTOR, _ensure_rendered, species, seed_obj, t_doy,
         )
         return FileResponse(sidecar_path, media_type="application/json")
+
+    @app.get("/seed/random")
+    def random_seed():
+        """Return a fresh seed string. Viewer's 'new seed' button calls this."""
+        s = Seed.random()
+        return {"canonical": s.canonical(), "display": s.display()}
+
+    @app.get("/seed/normalize")
+    def normalize_seed(seed: str):
+        """Parse a user-typed seed and return canonical + display forms.
+        Used by the viewer's 'paste seed' input to round-trip user input.
+        """
+        s = _parse_seed(seed)
+        return {"canonical": s.canonical(), "display": s.display()}
 
     @app.get("/health")
     def health():

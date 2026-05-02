@@ -11,6 +11,29 @@
   }
   #info h1 { margin: 0 0 0.25rem 0; font-size: 1.1rem; font-weight: 500; }
   #info p { margin: 0; font-size: 0.85rem; opacity: 0.7; }
+  #seed-bar {
+    margin-top: 0.5rem; display: flex; align-items: center; gap: 0.5rem;
+    pointer-events: auto; font-size: 0.85rem;
+  }
+  #seed-bar label { opacity: 0.7; }
+  #seed-display {
+    font-family: ui-monospace, monospace; font-size: 0.95rem;
+    background: rgba(255,255,255,0.08); padding: 0.15rem 0.5rem;
+    border-radius: 4px; letter-spacing: 0.05em;
+  }
+  #seed-bar button, #seed-bar input {
+    background: rgba(255,255,255,0.1); color: #eee;
+    border: 1px solid rgba(255,255,255,0.15); border-radius: 4px;
+    padding: 0.2rem 0.55rem; font-size: 0.8rem; cursor: pointer;
+    font-family: ui-monospace, monospace;
+  }
+  #seed-bar button:hover { background: rgba(255,255,255,0.2); }
+  #seed-input { width: 7rem; text-transform: uppercase; cursor: text; }
+  #seed-flash {
+    font-size: 0.75rem; opacity: 0; transition: opacity 0.2s;
+    color: #6ba368;
+  }
+  #seed-flash.visible { opacity: 1; }
   #controls {
     position: absolute; bottom: 0; left: 0; right: 0; padding: 1rem;
     background: rgba(0,0,0,0.7); z-index: 10;
@@ -27,6 +50,15 @@
 <div id="info">
   <h1 id="title">plant_sim viewer</h1>
   <p>Drag to rotate. Scroll to zoom. Slider scrubs through the season.</p>
+  <div id="seed-bar">
+    <label>seed:</label>
+    <span id="seed-display">--------</span>
+    <button id="seed-copy" title="Copy seed">copy</button>
+    <button id="seed-new" title="Generate fresh random seed">new</button>
+    <input id="seed-input" placeholder="paste seed" maxlength="9" spellcheck="false">
+    <button id="seed-load" title="Load pasted seed">load</button>
+    <span id="seed-flash">copied</span>
+  </div>
 </div>
 
 <div id="controls">

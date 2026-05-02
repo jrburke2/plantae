@@ -192,12 +192,15 @@ def test_generate_with_seed_changes_stochastic_draws():
 
 
 def test_write_uses_content_addressed_filename(tmp_path: Path):
+    """Filenames embed the canonical 8-char base32 seed (not raw int)."""
+    from plant_sim.schema.seed import Seed
     sp = load_species(ECHINACEA_YAML)
     path = write(sp, output_dir=tmp_path, seed=4711)
-    assert path.name == "echinacea_purpurea_seed_4711.lpy"
+    canonical = Seed(4711).canonical()  # e.g. '00000IM7'
+    assert path.name == f"echinacea_purpurea_seed_{canonical}.lpy"
     assert path.exists()
     body = path.read_text()
-    assert "SPECIMEN_SEED = 4711" in body
+    assert f"SPECIMEN_SEED = {4711}" in body  # int form still in extern
 
 
 def test_write_runs_validator_and_blocks_on_error(tmp_path: Path):
@@ -241,6 +244,7 @@ def test_write_runs_validator_and_blocks_on_error(tmp_path: Path):
 # ---- CLI integration ----
 
 def test_cli_generate_writes_file(tmp_path: Path):
+    from plant_sim.schema.seed import Seed
     runner = CliRunner()
     out = tmp_path / "generated"
     result = runner.invoke(
@@ -248,9 +252,24 @@ def test_cli_generate_writes_file(tmp_path: Path):
         ["generate", str(ECHINACEA_YAML), "--output", str(out), "--seed", "7"],
     )
     assert result.exit_code == 0, result.output
-    expected = out / "echinacea_purpurea_seed_7.lpy"
+    expected = out / f"echinacea_purpurea_seed_{Seed(7).canonical()}.lpy"
     assert expected.exists()
     assert "Wrote" in result.output
+
+
+def test_cli_generate_accepts_string_seed(tmp_path: Path):
+    """BOI-style shareable string seeds work end-to-end through the CLI."""
+    runner = CliRunner()
+    out = tmp_path / "generated"
+    result = runner.invoke(
+        cli_main,
+        ["generate", str(ECHINACEA_YAML), "--output", str(out), "--seed", "XQF2-D6S1"],
+    )
+    assert result.exit_code == 0, result.output
+    expected = out / "echinacea_purpurea_seed_XQF2D6S1.lpy"
+    assert expected.exists()
+    # Round-trip through display form in the CLI output
+    assert "XQF2-D6S1" in result.output
 
 
 def test_cli_generate_rejects_invalid_yaml(tmp_path: Path):

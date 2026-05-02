@@ -128,7 +128,10 @@ def test_sidecar_material_distribution_at_peak(tmp_path: Path, lpy_path: Path):
 
 
 def test_write_uses_content_addressed_filename(tmp_path: Path):
+    """Filenames embed the canonical 8-char base32 seed (not raw int)."""
+    from plant_sim.schema.seed import Seed
     sp = Species.from_yaml(ANDROPOGON_YAML)
     path = write(sp, output_dir=tmp_path, seed=4711)
-    assert path.name == "andropogon_gerardii_seed_4711.lpy"
+    canonical = Seed(4711).canonical()
+    assert path.name == f"andropogon_gerardii_seed_{canonical}.lpy"
     assert path.exists()

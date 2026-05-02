@@ -22,8 +22,9 @@ import {
 
 const params = new URLSearchParams(window.location.search);
 const SPECIES = params.get('species') || 'echinacea_purpurea';
-const SEED = parseInt(params.get('seed') || '42', 10);
-document.getElementById('title').textContent = `plant_sim viewer — ${SPECIES} (seed ${SEED})`;
+// Seed is a string. Server accepts canonical, display, or integer forms.
+let SEED = params.get('seed') || '42';
+document.getElementById('title').textContent = `plant_sim viewer — ${SPECIES}`;
 
 // === Three.js scene ===
 
@@ -81,8 +82,8 @@ const meshCache = new Map();
 
 async function loadFrame(t) {
   setStatus(`loading t=${t}...`);
-  const objUrl = `/render/scene.obj?species=${SPECIES}&seed=${SEED}&t=${t}`;
-  const sidecarUrl = `/render/scene.materials.json?species=${SPECIES}&seed=${SEED}&t=${t}`;
+  const objUrl = `/render/scene.obj?species=${SPECIES}&seed=${encodeURIComponent(SEED)}&t=${t}`;
+  const sidecarUrl = `/render/scene.materials.json?species=${SPECIES}&seed=${encodeURIComponent(SEED)}&t=${t}`;
 
   // Fetch sidecar in parallel with OBJ.
   const sidecarPromise = fetch(sidecarUrl).then(r => {
@@ -107,7 +108,83 @@ async function loadFrame(t) {
   scene.add(obj);
   currentMesh = obj;
   setStatus(`frame t=${t} loaded (${sidecar.meta.scene_shape_count} shapes)`);
+
+  // Sync the seed display from the sidecar's normalized form. The first
+  // load establishes the canonical seed even if the URL had it in a
+  // legacy/integer form.
+  if (sidecar.meta.seed_display) {
+    setSeedDisplay(sidecar.meta.seed_display);
+    SEED = sidecar.meta.seed;  // canonical form for subsequent fetches
+  }
 }
+
+// === Seed UI ===
+
+function setSeedDisplay(displayString) {
+  document.getElementById('seed-display').textContent = displayString;
+}
+
+function flashSeedMessage(text) {
+  const el = document.getElementById('seed-flash');
+  el.textContent = text;
+  el.classList.add('visible');
+  clearTimeout(flashSeedMessage._t);
+  flashSeedMessage._t = setTimeout(() => el.classList.remove('visible'), 1200);
+}
+
+function updateUrlSeed(canonicalSeed) {
+  const url = new URL(window.location.href);
+  url.searchParams.set('seed', canonicalSeed);
+  window.history.replaceState({}, '', url);
+}
+
+document.getElementById('seed-copy').addEventListener('click', async () => {
+  const text = document.getElementById('seed-display').textContent;
+  try {
+    await navigator.clipboard.writeText(text);
+    flashSeedMessage('copied');
+  } catch (err) {
+    flashSeedMessage('copy failed');
+  }
+});
+
+document.getElementById('seed-new').addEventListener('click', async () => {
+  const resp = await fetch('/seed/random');
+  const { canonical, display } = await resp.json();
+  SEED = canonical;
+  setSeedDisplay(display);
+  updateUrlSeed(canonical);
+  // Drop the mesh cache and force a reload at the current t.
+  meshCache.clear();
+  updateForT(currentT);
+});
+
+async function loadSeedFromInput() {
+  const raw = document.getElementById('seed-input').value.trim();
+  if (!raw) return;
+  try {
+    const resp = await fetch(`/seed/normalize?seed=${encodeURIComponent(raw)}`);
+    if (!resp.ok) {
+      const err = await resp.json();
+      flashSeedMessage(`bad seed: ${err.detail || 'unknown'}`);
+      return;
+    }
+    const { canonical, display } = await resp.json();
+    SEED = canonical;
+    setSeedDisplay(display);
+    updateUrlSeed(canonical);
+    document.getElementById('seed-input').value = '';
+    meshCache.clear();
+    updateForT(currentT);
+  } catch (err) {
+    flashSeedMessage('parse failed');
+  }
+}
+
+document.getElementById('seed-load').addEventListener('click', loadSeedFromInput);
+document.getElementById('seed-input').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') loadSeedFromInput();
+});
 
 async function updateForT(t) {
   if (inFlight) {

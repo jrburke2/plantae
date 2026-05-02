@@ -21,6 +21,7 @@ from jinja2 import Environment, FileSystemLoader, StrictUndefined
 
 from plant_sim.codegen.validator import ValidationError, validate_lpy
 from plant_sim.schema.render_context import RenderContext
+from plant_sim.schema.seed import Seed
 from plant_sim.schema.species import Species
 
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
@@ -104,7 +105,11 @@ def _build_meters_dict(species: Species) -> dict:
 
 def _build_render_extras(render_ctx: RenderContext) -> dict:
     return {
-        "seed": render_ctx.seed,
+        # int form for `random.seed(SPECIMEN_SEED)` in the .lpy
+        "seed": render_ctx.seed.to_int(),
+        # display string for the .lpy header comment + sidecar meta
+        "seed_string": render_ctx.seed.canonical(),
+        "seed_display": render_ctx.seed.display(),
         "time_offset_doy": render_ctx.time_offset_doy,
         "emergence_offset_days": render_ctx.emergence_offset_days,
         "position_x_m": render_ctx.position_x_m,
@@ -139,22 +144,29 @@ def render_archetype(species: Species, render_ctx: RenderContext | None = None) 
     return template.render(**context)
 
 
-def generate(species: Species, seed: int | None = None) -> str:
-    """Convenience wrapper: render with a seed-only RenderContext."""
-    render_ctx = RenderContext(seed=seed) if seed is not None else RenderContext()
+def generate(species: Species, seed: Seed | int | str | None = None) -> str:
+    """Convenience wrapper: render with a seed-only RenderContext.
+
+    Accepts a Seed instance, an int (legacy), a string (canonical or display),
+    or None (default Seed(42) for backward compat).
+    """
+    if seed is None:
+        render_ctx = RenderContext()
+    else:
+        render_ctx = RenderContext(seed=Seed(seed))
     return render_archetype(species, render_ctx)
 
 
-def _content_addressed_filename(species: Species, seed: int) -> str:
-    """`<genus>_<species>_seed_<n>.lpy`. Source: scientific_name (deterministic)."""
+def _content_addressed_filename(species: Species, seed: Seed) -> str:
+    """`<genus>_<species>_seed_<canonical>.lpy`. Canonical = uppercase base32."""
     base = species.scientific_name.lower().replace(" ", "_").replace(".", "")
-    return f"{base}_seed_{seed}.lpy"
+    return f"{base}_seed_{seed.canonical()}.lpy"
 
 
 def write(
     species: Species,
     output_dir: Path | str,
-    seed: int | None = None,
+    seed: Seed | int | str | None = None,
     *,
     skip_validation: bool = False,
 ) -> Path:
@@ -164,14 +176,14 @@ def write(
     in `plant_sim.codegen.validator.validate_lpy` (unless `skip_validation`
     is set, which is meant for codegen development only).
     """
-    seed_to_use = seed if seed is not None else 42
-    source = generate(species, seed=seed_to_use)
+    seed_obj = Seed(seed) if seed is not None else Seed(42)
+    source = generate(species, seed=seed_obj)
 
     if not skip_validation:
         validate_lpy(source)  # raises ValidationError on errors
 
     out_dir = Path(output_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
-    path = out_dir / _content_addressed_filename(species, seed_to_use)
+    path = out_dir / _content_addressed_filename(species, seed_obj)
     path.write_text(source)
     return path

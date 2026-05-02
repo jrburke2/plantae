@@ -25,6 +25,7 @@ from plant_sim.codegen.validator import (
     ValidationError as LpyValidationError,
     collect_material_ids,
 )
+from plant_sim.schema.seed import Seed
 from plant_sim.schema.species import Species
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -73,14 +74,15 @@ def schema_json(output: str) -> None:
 @click.argument("species_yaml", type=click.Path(exists=True, dir_okay=False))
 @click.option("--output", "-o", type=click.Path(file_okay=False), default="generated",
               help="Directory to write the generated .lpy file into.")
-@click.option("--seed", type=int, default=42,
-              help="Specimen seed. Same species + same seed = bit-identical specimen.")
+@click.option("--seed", type=str, default="42",
+              help=("Specimen seed. 8-char Crockford base32 like 'XQF2-D6S1' or "
+                    "an integer for backward compat. Use 'random' to generate a fresh seed."))
 @click.option("--materials-lib", type=click.Path(exists=True, dir_okay=False),
               default=str(DEFAULT_MATERIALS_LIB),
               help="Path to the materials library JSON file (for material_id cross-check).")
 @click.option("--skip-material-check", is_flag=True,
               help="Skip cross-checking material_ids against the library.")
-def generate(species_yaml: str, output: str, seed: int,
+def generate(species_yaml: str, output: str, seed: str,
              materials_lib: str, skip_material_check: bool) -> None:
     """Generate an .lpy file from a species YAML.
 
@@ -116,15 +118,25 @@ def generate(species_yaml: str, output: str, seed: int,
                 click.echo(f"  {i}", err=True)
             sys.exit(1)
 
+    # Resolve seed: 'random' -> fresh seed; otherwise parse string/int.
+    if seed.lower() == "random":
+        seed_obj = Seed.random()
+    else:
+        try:
+            seed_obj = Seed(seed)
+        except ValueError as e:
+            click.echo(f"ERROR: invalid --seed {seed!r}: {e}", err=True)
+            sys.exit(1)
+
     try:
-        path = write_lpy(sp, output_dir=output, seed=seed)
+        path = write_lpy(sp, output_dir=output, seed=seed_obj)
     except LpyValidationError as e:
         click.echo(f"ERROR: generated .lpy failed static validation:", err=True)
         for i in e.issues:
             click.echo(f"  {i}", err=True)
         sys.exit(1)
 
-    click.echo(f"Wrote {path}")
+    click.echo(f"Wrote {path}  (seed: {seed_obj.display()})")
 
 
 @main.command()

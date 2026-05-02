@@ -63,6 +63,7 @@ def test_render_obj_pre_flush_is_empty(client):
 # ---- /render/scene.materials.json ----
 
 def test_render_sidecar_returns_json(client):
+    from plant_sim.schema.seed import Seed
     resp = client.get("/render/scene.materials.json?species=echinacea_purpurea&seed=42&t=250")
     assert resp.status_code == 200
     body = resp.json()
@@ -70,8 +71,48 @@ def test_render_sidecar_returns_json(client):
     assert "meta" in body
     assert body["meta"]["t_render"] == 250.0
     assert body["meta"]["species"] == "echinacea_purpurea"
-    assert body["meta"]["seed"] == 42
+    # Seed comes back in canonical (8-char base32) and display forms
+    assert body["meta"]["seed"] == Seed(42).canonical()
+    assert body["meta"]["seed_display"] == Seed(42).display()
     assert all("name" in e and "material_id" in e for e in body["shapes"])
+
+
+def test_random_seed_endpoint(client):
+    resp = client.get("/seed/random")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert "canonical" in body and "display" in body
+    assert len(body["canonical"]) == 8
+    assert "-" in body["display"]
+
+
+def test_normalize_seed_endpoint(client):
+    """Viewer's 'paste seed' input round-trips arbitrary user input."""
+    resp = client.get("/seed/normalize?seed=xqf2-d6s1")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["canonical"] == "XQF2D6S1"
+    assert body["display"] == "XQF2-D6S1"
+
+
+def test_normalize_rejects_garbage(client):
+    # Wrong length after stripping separators
+    resp = client.get("/seed/normalize?seed=ABC")
+    assert resp.status_code == 400
+    # 'U' isn't in Crockford base32
+    resp = client.get("/seed/normalize?seed=ABCDEFGU")
+    assert resp.status_code == 400
+
+
+def test_string_seed_in_render_url(client):
+    """End-to-end: a Crockford string seed in the URL renders cleanly."""
+    resp = client.get(
+        "/render/scene.materials.json?species=echinacea_purpurea&seed=XQF2-D6S1&t=200"
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["meta"]["seed"] == "XQF2D6S1"
+    assert body["meta"]["seed_display"] == "XQF2-D6S1"
 
 
 def test_render_sidecar_count_matches_obj_groups(client):

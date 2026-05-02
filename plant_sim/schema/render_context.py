@@ -13,15 +13,22 @@ from __future__ import annotations
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from plant_sim.schema.seed import Seed
+
 
 class RenderContext(BaseModel):
     """Per-render parameters; defaults are correct for single-specimen Phase 0 use."""
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", arbitrary_types_allowed=True)
 
-    seed: int = Field(
-        default=42,
-        description="Random seed for stochastic per-instance parameters. Same species + same seed = bit-identical specimen.",
+    seed: Seed = Field(
+        default_factory=lambda: Seed(42),
+        description=(
+            "Specimen seed — 8-char Crockford base32 (e.g. 'XQF2-D6S1') or an "
+            "integer for backward compat. Same species + same seed = bit-identical "
+            "specimen. Shareable: paste a seed string into the viewer URL or "
+            "another instance to reproduce the exact specimen."
+        ),
     )
     time_offset_doy: float = Field(
         default=0.0,
