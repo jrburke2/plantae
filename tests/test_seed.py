@@ -49,54 +49,31 @@ def test_string_round_trip():
 
 # ---- Parsing forgiveness ----
 
-def test_lowercase_accepted():
-    s = Seed("xqf2d6s1")
-    assert s.canonical() == "XQF2D6S1"
-
-
-def test_hyphen_optional():
-    a = Seed("XQF2-D6S1")
-    b = Seed("XQF2D6S1")
-    assert a == b
-
-
-def test_space_separator_accepted():
-    s = Seed("XQF2 D6S1")
-    assert s.canonical() == "XQF2D6S1"
-
-
-def test_crockford_io_l_normalization():
-    """Crockford rule: I/L -> 1, O -> 0 on parse (visual ambiguity)."""
-    # `00OO00LL` -> Crockford fix -> `00000011` (base32) -> int 0b00001_00001 = 33.
-    # `Seed("00000011")` would hit the all-digits path and parse as int 11, so
-    # we compare against the integer Seed directly to test the base32 path.
-    assert Seed("00OO00LL") == Seed(33)
-
-
-def test_integer_string_accepted():
-    """Backward compat: '42' parses as integer 42."""
-    assert Seed("42") == Seed(42)
-    assert Seed("1337") == Seed(1337)
+@pytest.mark.parametrize("input,expected_int", [
+    ("xqf2d6s1", Seed("XQF2D6S1").to_int()),    # lowercase normalizes
+    ("XQF2-D6S1", Seed("XQF2D6S1").to_int()),   # hyphen separator optional
+    ("XQF2 D6S1", Seed("XQF2D6S1").to_int()),   # space separator accepted
+    # Crockford rule: I/L -> 1, O -> 0 on parse (visual ambiguity).
+    # `00OO00LL` -> `00000011` (base32) -> int 33.
+    ("00OO00LL", 33),
+    ("42", 42),                                  # integer-string backward compat
+    ("1337", 1337),
+])
+def test_parse_accepts(input, expected_int):
+    assert Seed(input).to_int() == expected_int
 
 
 # ---- Validation ----
 
-def test_wrong_length_rejected():
-    with pytest.raises(ValueError, match="expected exactly"):
-        Seed("ABC")
-    with pytest.raises(ValueError, match="expected exactly"):
-        Seed("ABCDEFGHIJ")  # 10 chars (after I -> 1 normalization, still 10)
-
-
-def test_invalid_alphabet_rejected():
-    # 'U' isn't in Crockford
-    with pytest.raises(ValueError, match="invalid base32 char"):
-        Seed("00000UUU")
-
-
-def test_negative_int_rejected():
-    with pytest.raises(ValueError, match="non-negative"):
-        Seed(-1)
+@pytest.mark.parametrize("bad_input,error_match", [
+    ("ABC", "expected exactly"),                # too short
+    ("ABCDEFGHIJ", "expected exactly"),         # too long (10 chars after I->1 norm)
+    ("00000UUU", "invalid base32 char"),        # 'U' isn't in Crockford
+    (-1, "non-negative"),                       # negative int
+])
+def test_parse_rejects(bad_input, error_match):
+    with pytest.raises(ValueError, match=error_match):
+        Seed(bad_input)
 
 
 def test_int_above_max_wraps_for_compat():

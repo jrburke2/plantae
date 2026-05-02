@@ -57,32 +57,27 @@ def test_rosette_defaults_applied():
 
 # ---- Failure modes produce specific errors ----
 
-def test_phenology_out_of_order():
+# Each row: (fixture, required_substrings). Tuple within means "any of these"
+# (used for Pydantic version-portable error wording).
+@pytest.mark.parametrize("fixture,required_substrings", [
+    ("invalid_phenology_order.yaml",
+     ["phenology doy values must be strictly increasing", "leaf_flush_doy"]),
+    ("invalid_height_range_inverted.yaml",
+     ["range min"]),
+    ("invalid_missing_required.yaml",
+     ["family", ("missing", "field required")]),
+    ("invalid_unknown_archetype.yaml",
+     ["archetype"]),
+])
+def test_invalid_fixture_rejected(fixture, required_substrings):
     with pytest.raises(ValidationError) as exc:
-        Species.from_yaml(FIX / "invalid_phenology_order.yaml")
-    msg = str(exc.value)
-    assert "phenology DOY values must be strictly increasing" in msg
-    assert "leaf_flush_doy" in msg
-
-
-def test_height_range_inverted():
-    with pytest.raises(ValidationError) as exc:
-        Species.from_yaml(FIX / "invalid_height_range_inverted.yaml")
-    assert "range min" in str(exc.value).lower()
-
-
-def test_missing_required_field():
-    with pytest.raises(ValidationError) as exc:
-        Species.from_yaml(FIX / "invalid_missing_required.yaml")
-    msg = str(exc.value)
-    assert "family" in msg
-    assert "missing" in msg.lower() or "field required" in msg.lower()
-
-
-def test_unknown_archetype():
-    with pytest.raises(ValidationError) as exc:
-        Species.from_yaml(FIX / "invalid_unknown_archetype.yaml")
-    assert "archetype" in str(exc.value).lower()
+        Species.from_yaml(FIX / fixture)
+    msg = str(exc.value).lower()
+    for req in required_substrings:
+        if isinstance(req, tuple):
+            assert any(alt in msg for alt in req), f"none of {req} found in: {msg}"
+        else:
+            assert req in msg, f"{req!r} not found in: {msg}"
 
 
 # ---- JSON Schema export contains field descriptions and archetype values ----

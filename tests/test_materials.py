@@ -64,58 +64,37 @@ def test_color_curve_entry_validates():
     assert len(e.color_curve) == 2
 
 
-def test_neither_color_nor_curve_errors():
+# MaterialEntry validation errors with a specific user-facing message.
+@pytest.mark.parametrize("kwargs,expected_substring", [
+    ({"roughness": 0.5},
+     "either `color` or `color_curve`"),
+    ({"color": "#3a6b40",
+      "color_curve": [{"doy": 100, "color": "#a8c878"}, {"doy": 200, "color": "#3a6b40"}]},
+     "cannot have both"),
+    ({"color_curve": [{"doy": 280, "color": "#b85a2c"}, {"doy": 100, "color": "#a8c878"}]},
+     "sorted by doy"),
+    ({"color_curve": [{"doy": 100, "color": "#a8c878"}]},
+     "at least 2 keyframes"),
+])
+def test_material_entry_message(kwargs, expected_substring):
     with pytest.raises(ValidationError) as exc:
-        MaterialEntry(roughness=0.5)
-    assert "either `color` or `color_curve`" in str(exc.value)
+        MaterialEntry(**kwargs)
+    assert expected_substring in str(exc.value)
 
 
-def test_both_color_and_curve_errors():
-    with pytest.raises(ValidationError) as exc:
-        MaterialEntry(
-            color="#3a6b40",
-            color_curve=[{"doy": 100, "color": "#a8c878"}, {"doy": 200, "color": "#3a6b40"}],
-        )
-    assert "cannot have both" in str(exc.value)
-
-
-def test_color_curve_must_be_doy_sorted():
-    with pytest.raises(ValidationError) as exc:
-        MaterialEntry(color_curve=[
-            {"doy": 280, "color": "#b85a2c"},
-            {"doy": 100, "color": "#a8c878"},
-        ])
-    assert "sorted by doy" in str(exc.value)
-
-
-def test_color_curve_needs_two_keyframes():
-    with pytest.raises(ValidationError) as exc:
-        MaterialEntry(color_curve=[{"doy": 100, "color": "#a8c878"}])
-    assert "at least 2 keyframes" in str(exc.value)
-
-
-def test_invalid_hex_color_rejected():
+# Field-level rejection cases (any ValidationError counts; Pydantic's own
+# constraint messages are not part of our public surface).
+@pytest.mark.parametrize("ctor,kwargs", [
+    (MaterialEntry, {"color": "not_a_hex"}),
+    (MaterialEntry, {"color": "#zzz"}),
+    (ColorKeyframe, {"doy": 400, "color": "#3a6b40"}),
+    (MaterialEntry, {"color": "#3a6b40", "roughness": 1.5}),       # > unit range
+    (MaterialEntry, {"color": "#3a6b40", "metalness": -0.1}),      # < unit range
+    (MaterialEntry, {"color": "#3a6b40", "side": "UpsideDownSide"}),  # unknown enum
+])
+def test_validation_error_raised(ctor, kwargs):
     with pytest.raises(ValidationError):
-        MaterialEntry(color="not_a_hex")
-    with pytest.raises(ValidationError):
-        MaterialEntry(color="#zzz")
-
-
-def test_doy_out_of_range_rejected():
-    with pytest.raises(ValidationError):
-        ColorKeyframe(doy=400, color="#3a6b40")
-
-
-def test_roughness_metalness_clamped_to_unit_range():
-    with pytest.raises(ValidationError):
-        MaterialEntry(color="#3a6b40", roughness=1.5)
-    with pytest.raises(ValidationError):
-        MaterialEntry(color="#3a6b40", metalness=-0.1)
-
-
-def test_unknown_side_rejected():
-    with pytest.raises(ValidationError):
-        MaterialEntry(color="#3a6b40", side="UpsideDownSide")
+        ctor(**kwargs)
 
 
 # ---- Cross-check: every reference species' material_ids exist in library ----

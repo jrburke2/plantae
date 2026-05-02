@@ -27,25 +27,16 @@ FIX = Path(__file__).parent / "fixtures"
 
 # ---- Built-in length units ----
 
-def test_inches_to_meters():
-    us = UnitSystem(length="in")
-    assert us.length_to_meters(1.0) == pytest.approx(0.0254)
-    assert us.length_to_meters(48.0) == pytest.approx(1.2192)
-
-
-def test_centimeters_to_meters():
-    us = UnitSystem(length="cm")
-    assert us.length_to_meters(100.0) == pytest.approx(1.0)
-
-
-def test_meters_passthrough():
-    us = UnitSystem(length="m")
-    assert us.length_to_meters(2.5) == 2.5
-
-
-def test_feet_to_meters():
-    us = UnitSystem(length="ft")
-    assert us.length_to_meters(7.0) == pytest.approx(2.1336)
+@pytest.mark.parametrize("unit,value,expected_meters", [
+    ("in", 1.0, 0.0254),
+    ("in", 48.0, 1.2192),
+    ("cm", 100.0, 1.0),
+    ("m", 2.5, 2.5),
+    ("ft", 7.0, 2.1336),
+])
+def test_length_to_meters(unit, value, expected_meters):
+    us = UnitSystem(length=unit)
+    assert us.length_to_meters(value) == pytest.approx(expected_meters)
 
 
 def test_known_units_listed():
