@@ -181,8 +181,19 @@ def make_app() -> FastAPI:
     app.mount("/viewer", StaticFiles(directory=str(VIEWER_DIR), html=True), name="viewer")
 
     @app.get("/")
-    def root():
-        return RedirectResponse(url="/viewer/?species=echinacea_purpurea&seed=42")
+    def root(species: str = "echinacea_purpurea", seed: str | None = None):
+        """Land on the viewer with a fresh random seed by default.
+
+        BOI-style: every visit is a new specimen. If the user wants to keep
+        a particular plant, they copy the seed (or the URL — `?seed=` is
+        always present after the redirect). If they pass `?seed=` themselves
+        in the URL, we honor it instead of generating a new one.
+        """
+        if seed is None:
+            seed = Seed.random().canonical()
+        return RedirectResponse(
+            url=f"/viewer/?species={species}&seed={seed}"
+        )
 
     return app
 
