@@ -78,6 +78,15 @@
       "title": "CustomLengthUnit",
       "type": "object"
     },
+    "GradeTag": {
+      "description": "Use-case grade per species. F44.",
+      "enum": [
+        "restoration_grade",
+        "ornamental_grade"
+      ],
+      "title": "GradeTag",
+      "type": "string"
+    },
     "GrowthForm": {
       "enum": [
         "herbaceous_perennial",
@@ -204,6 +213,88 @@
         "ray_count_range"
       ],
       "title": "InflorescenceParams",
+      "type": "object"
+    },
+    "MaterialForm": {
+      "description": "Plant material form for procurement. Canonical enum; F43.",
+      "enum": [
+        "seed",
+        "plug",
+        "container_1gal",
+        "container_3gal",
+        "bare_root",
+        "B&B",
+        "bulb_corm_rhizome",
+        "cutting"
+      ],
+      "title": "MaterialForm",
+      "type": "string"
+    },
+    "MaterialMeta": {
+      "additionalProperties": false,
+      "description": "Plant material form metadata per species (F43).",
+      "properties": {
+        "allowed_forms": {
+          "description": "Material forms this species supports (e.g. seed, plug, container_1gal). At least one.",
+          "items": {
+            "$ref": "#/$defs/MaterialForm"
+          },
+          "minItems": 1,
+          "title": "Allowed Forms",
+          "type": "array"
+        },
+        "default_form": {
+          "$ref": "#/$defs/MaterialForm",
+          "description": "Default form for BOM rows. Must be one of allowed_forms."
+        }
+      },
+      "required": [
+        "allowed_forms",
+        "default_form"
+      ],
+      "title": "MaterialMeta",
+      "type": "object"
+    },
+    "OriginRange": {
+      "additionalProperties": false,
+      "description": "Lat/lon bounding box for a species' native origin.",
+      "properties": {
+        "lat": {
+          "description": "Latitude range [min, max] in WGS84 degrees, -90..90.",
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            }
+          ],
+          "title": "Lat",
+          "type": "array"
+        },
+        "lon": {
+          "description": "Longitude range [min, max] in WGS84 degrees, -180..180.",
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            }
+          ],
+          "title": "Lon",
+          "type": "array"
+        }
+      },
+      "required": [
+        "lat",
+        "lon"
+      ],
+      "title": "OriginRange",
       "type": "object"
     },
     "PanicleParams": {
@@ -371,6 +462,35 @@
       ],
       "title": "Phyllotaxis",
       "type": "string"
+    },
+    "Provenance": {
+      "additionalProperties": false,
+      "description": "Provenance attribute for ecotype-aware procurement (F45).",
+      "properties": {
+        "ecoregion": {
+          "description": "Ecoregion code: Bailey or EPA Level III/IV (e.g. 'EPA_L3_54').",
+          "minLength": 1,
+          "title": "Ecoregion",
+          "type": "string"
+        },
+        "origin_range": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/OriginRange"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional lat/lon bounding box of the species' native origin range."
+        }
+      },
+      "required": [
+        "ecoregion"
+      ],
+      "title": "Provenance",
+      "type": "object"
     },
     "RosetteParams": {
       "additionalProperties": false,
@@ -771,6 +891,23 @@
       "description": "Archetype-specific parameter block. Schema dispatched on `archetype`.",
       "title": "Parameters"
     },
+    "material": {
+      "$ref": "#/$defs/MaterialMeta",
+      "description": "Plant material form metadata (allowed forms + default form). F43."
+    },
+    "grade": {
+      "description": "Use-case grade(s): restoration_grade, ornamental_grade, or both. F44.",
+      "items": {
+        "$ref": "#/$defs/GradeTag"
+      },
+      "minItems": 1,
+      "title": "Grade",
+      "type": "array"
+    },
+    "provenance": {
+      "$ref": "#/$defs/Provenance",
+      "description": "Provenance: ecoregion code plus optional origin lat/lon range. F45."
+    },
     "template_override": {
       "anyOf": [
         {
@@ -796,7 +933,10 @@
     "habitat",
     "references",
     "phenology",
-    "parameters"
+    "parameters",
+    "material",
+    "grade",
+    "provenance"
   ],
   "title": "Species",
   "type": "object"
