@@ -179,7 +179,7 @@ class MaterialCrossCheck:
     @classmethod
     def load(cls, library_path: Path | str) -> "MaterialCrossCheck":
         p = Path(library_path)
-        with p.open() as f:
+        with p.open(encoding="utf-8") as f:
             library = json.load(f)
         return cls(library_path=p, library=library)
 

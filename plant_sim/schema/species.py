@@ -545,6 +545,6 @@ class Species(BaseModel):
     @classmethod
     def from_yaml(cls, path: Path | str) -> Species:
         path = Path(path)
-        with path.open() as f:
+        with path.open(encoding="utf-8") as f:
             data = yaml.safe_load(f)
         return cls.model_validate(data)

@@ -90,7 +90,7 @@ class Mix(BaseModel):
     @classmethod
     def from_yaml(cls, path: Path | str) -> Mix:
         path = Path(path)
-        with path.open() as f:
+        with path.open(encoding="utf-8") as f:
             data = yaml.safe_load(f)
         mix = cls.model_validate(data)
         expected = path.stem

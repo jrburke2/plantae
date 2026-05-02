@@ -26,7 +26,7 @@ grade: [restoration_grade]
 # F45: provenance. A. gerardii's native range is broad; ecoregion is representative.
 provenance:
   ecoregion: EPA_L3_54
-  # origin_range omitted — demonstrates the optional case.
+  # origin_range omitted - demonstrates the optional case.
 
 habitat:
   primary: [mesic_prairie, dry-mesic_prairie]
