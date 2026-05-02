@@ -8,13 +8,29 @@ If you're adding a species, see
 
 ---
 
+## Long-term direction
+
+Phase 0 ships an L-Py-on-the-server runtime. **V2 moves the algorithm to the
+browser** via a TypeScript codegen target — see
+[V2_BROWSER_RUNTIME_PLAN.md](V2_BROWSER_RUNTIME_PLAN.md) for the full plan
+and migration phases. During V2.0–V2.3 both runtimes coexist; the L-Py path
+keeps working unchanged. After V2.3 cutover, L-Py becomes a dev/research
+tool (faster prototyping, OpenAlea-model experiments) and production runs
+client-side.
+
+When adding a new archetype today (Phase 1), prefer template patterns that
+will translate cleanly to TypeScript later: keep growth functions in the
+shared `growth_functions/` module, avoid L-Py-specific syntax beyond the
+documented set, document any L-Py idiom that would be hard to express
+imperatively. The TS template-authoring guide will land alongside V2.1.
+
 ## Setup
 
 ```bash
 CONDA_SUBDIR=osx-64 mamba env create -f environment.yml   # macOS arm64; drop prefix on Linux/Intel
 mamba activate plant_sim
 pip install -e .
-pytest                                                     # 102 tests, ~5 sec
+pytest                                                     # 125 tests, ~5 sec
 ```
 
 Verify the dev server boots: `plant-sim serve`, open

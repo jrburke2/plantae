@@ -90,6 +90,23 @@ Templates compute effective phenology as `<event>_doy + EMERGENCE_OFFSET` before
 
 ---
 
+## Discussion 2026-05-02 — Runtime location for V2 (RESOLVED)
+
+**Q:** Where does the algorithm run for V2 — server (current Phase 0), pre-baked CDN, or browser?
+
+**A:** Browser. The 8-char seed space is ~1.1 trillion combinations per species; pre-baking everything is impossible (~3.85 PB per species), and pre-baking only a showcase pool sacrifices the BOI-style "share any seed" UX. Multi-specimen communities also need per-instance seed derivation evaluated wherever rendering happens. Browser-side generation is the only architecture that solves both.
+
+**How:** Path C with transitional hybrid — codegen gains a TypeScript emission target alongside the existing `.lpy` target. Both runtimes coexist during V2.0–V2.3; production cutover at V2.3 with parity tests guarding the switch. Full plan: [V2_BROWSER_RUNTIME_PLAN.md](V2_BROWSER_RUNTIME_PLAN.md).
+
+**Implications:**
+- PRNG portability becomes load-bearing — Python's Mersenne Twister and JS's `Math.random()` produce different sequences from the same seed. PCG (PCG-XSL-RR-128/64) replaces both. ~50 LOC each side.
+- Hierarchical seed derivation (BOI's `world → floor → room → entity` pattern) becomes `world → specimen → organ` via `Seed.derive(parent, salt)`. Locks the hash function explicitly so cross-runtime parity holds.
+- Template versioning surfaces in viewer + sidecar so users know "this seed in this template version" produced what they're seeing.
+- L-Py path becomes dev/research-only after V2.3 — useful for OpenAlea-model experiments and faster archetype prototyping, not production.
+- OpenAlea-model pass-through compatibility (proposed in earlier OPEN_QUESTIONS) becomes a research-only feature, not a public V1 promise. Logged here to avoid scope-creep later.
+
+---
+
 ## Pending — Per-specimen material variation
 
 **Q:** Sun-leaves vs shade-leaves, microhabitat color shifts. Currently `material_id` is baked at codegen time per species, not per specimen. Phase 4+ ecology problem; logged so it's not a surprise.

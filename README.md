@@ -9,6 +9,13 @@ Phase 0 status: **complete** — two archetypes (rosette_scape_composite,
 tiller_clump), two reference species (*Echinacea purpurea*,
 *Andropogon gerardii*), full pipeline from YAML to live slider.
 
+**V2 plan:** the algorithm will move to the browser. The codegen will gain a
+TypeScript emission target; production becomes serverless and supports
+arbitrary BOI-style seeds at scale. See
+[V2_BROWSER_RUNTIME_PLAN.md](V2_BROWSER_RUNTIME_PLAN.md) for the full
+migration plan. Phase 1 archetype work and V2 runtime work proceed in
+parallel; both runtimes coexist during the transition.
+
 ## Quick demo
 
 ```bash
