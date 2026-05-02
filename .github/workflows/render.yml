@@ -1,0 +1,128 @@
+name: render-on-yaml-change
+
+# When a PR touches species/**/*.yaml, regenerate + render each changed
+# species and post a summary comment on the PR. Phase 0 outputs text
+# stats only (shape counts, material distribution); Phase 2 will add
+# rendered PNGs per kickoff §10's deferred polish.
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'species/**/*.yaml'
+      - 'templates/**'
+      - 'plant_sim/codegen/**'
+      - 'plant_sim/render/**'
+      - 'materials/library.json'
+
+jobs:
+  render-changed-species:
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write   # required to post a comment
+      contents: read
+    defaults:
+      run:
+        shell: bash -el {0}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # need full history for `git diff` against base
+
+      - name: Set up conda env (openalea3 + dependencies)
+        uses: conda-incubator/setup-miniconda@v3
+        with:
+          environment-file: environment.yml
+          activate-environment: plant_sim
+          miniforge-version: latest
+          use-mamba: true
+
+      - name: Install package
+        run: pip install -e .
+
+      - name: Find changed species YAMLs
+        id: changed
+        run: |
+          # List every species YAML touched in this PR (added or modified).
+          changed=$(
+            git diff --name-only --diff-filter=AM \
+              "origin/${{ github.base_ref }}...HEAD" \
+              -- 'species/**/*.yaml' || true
+          )
+          # If no YAMLs changed but other watched paths did (template,
+          # codegen, materials), re-render BOTH reference species so the
+          # PR shows the impact.
+          if [ -z "$changed" ]; then
+            changed=$(git ls-files 'species/**/*.yaml')
+            echo "no species yaml changed; re-rendering all reference species"
+          fi
+          echo "files<<EOF" >> "$GITHUB_OUTPUT"
+          echo "$changed" >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
+
+      - name: Generate + render each changed species
+        id: render
+        run: |
+          mkdir -p ci_output
+          summary_file=$(mktemp)
+          echo "## CI render summary" > "$summary_file"
+          echo "" >> "$summary_file"
+          echo "Triggered by PR commit: \`${{ github.event.pull_request.head.sha }}\`" >> "$summary_file"
+          echo "" >> "$summary_file"
+
+          while IFS= read -r yaml; do
+            [ -z "$yaml" ] && continue
+            species=$(basename "$yaml" .yaml)
+            echo "### \`$species\`" >> "$summary_file"
+            echo '```' >> "$summary_file"
+
+            if ! plant-sim validate "$yaml" >> "$summary_file" 2>&1; then
+              echo "VALIDATION FAILED" >> "$summary_file"
+              echo '```' >> "$summary_file"
+              continue
+            fi
+
+            if ! plant-sim generate "$yaml" --seed 42 --output ci_output >> "$summary_file" 2>&1; then
+              echo "GENERATE FAILED" >> "$summary_file"
+              echo '```' >> "$summary_file"
+              continue
+            fi
+
+            lpy_path="ci_output/${species}_seed_42.lpy"
+            if ! plant-sim render "$lpy_path" --t 200 --output ci_output >> "$summary_file" 2>&1; then
+              echo "RENDER FAILED" >> "$summary_file"
+              echo '```' >> "$summary_file"
+              continue
+            fi
+
+            sidecar="ci_output/${species}_seed_42_t200.materials.json"
+            python - <<PY >> "$summary_file"
+          import json
+          from collections import Counter
+          s = json.load(open("$sidecar"))
+          mats = Counter(e["material_id"] for e in s["shapes"])
+          print(f"shapes: {s['meta']['scene_shape_count']}")
+          print("materials:")
+          for k, v in mats.most_common():
+              print(f"  {v:>4}  {k}")
+          PY
+            echo '```' >> "$summary_file"
+            echo "" >> "$summary_file"
+          done <<< "${{ steps.changed.outputs.files }}"
+
+          # Stash the summary path for the comment step.
+          echo "summary_file=$summary_file" >> "$GITHUB_OUTPUT"
+
+      - name: Post summary as PR comment
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const body = fs.readFileSync('${{ steps.render.outputs.summary_file }}', 'utf8');
+            await github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body,
+            });

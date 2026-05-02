@@ -1,0 +1,34 @@
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  pytest:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        # Use a login shell so `conda activate` works in subsequent steps.
+        shell: bash -el {0}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up conda env (openalea3 + dependencies)
+        uses: conda-incubator/setup-miniconda@v3
+        with:
+          environment-file: environment.yml
+          activate-environment: plant_sim
+          # mamba is much faster than vanilla conda at solving openalea
+          miniforge-version: latest
+          use-mamba: true
+
+      - name: Install package
+        run: pip install -e .
+
+      - name: Run pytest
+        run: pytest -v
