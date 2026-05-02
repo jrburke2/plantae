@@ -1,8 +1,8 @@
 # plantae
 
-Algorithmic plant simulator built on **L-Py + OpenAlea + three.js**.
+Algorithmic plant simulator built on **L-Py + OpenAlea + three.js**. The substrate is L-systems, the canonical biological-fractal formalism (Lindenmayer 1968): small recursive rule sets produce the self-similar structure plants actually exhibit.
 
-YAML in → OBJ + JSON sidecar out → slider scrubs continuous-time growth in a browser.
+YAML in → OBJ + JSON sidecar out → slider scrubs continuous-time growth in a browser. Communities of plants build from a shared scene seed; a user can select an arbitrary map shape and fill it with plants drawn from a species mix and density spec. Plantae's output ends at design and a portable plant-list BOM; procurement lives in a separable downstream product (see the marketplace concept doc).
 
 Substrate validated by 2026-05-02 spikes (Echinacea +9, Andropogon 4/4).
 Phase 0 status: **complete** — two archetypes (rosette_scape_composite,
@@ -15,6 +15,11 @@ arbitrary BOI-style seeds at scale. See
 [V2_BROWSER_RUNTIME_PLAN.md](V2_BROWSER_RUNTIME_PLAN.md) for the full
 migration plan. Phase 1 archetype work and V2 runtime work proceed in
 parallel; both runtimes coexist during the transition.
+
+**Reference docs:**
+- [REQUIREMENTS.md](REQUIREMENTS.md) — single source of truth for what plantae does, planned, and explicitly out of scope. Includes the Seams section enumerating active and resolved structural cuts.
+- [OPEN_QUESTIONS.md](OPEN_QUESTIONS.md) — running log of architectural decisions (resolved and pending), with rationale.
+- [engineering_principles.md](../engineering_principles.md) — cross-project engineering principles (P1 usability, P2-P4 minima, P5-P7 architectural commitments).
 
 ## Quick demo
 
@@ -74,8 +79,10 @@ three.js MeshStandardMaterial per mesh                (color curves evaluated cl
 
 Read the `OPEN_QUESTIONS.md` file for the running list of architectural
 decisions made during Phase 0 (export format, units, persistent marker,
-RenderContext plumbing, etc.). Read the design doc and Phase 0 kickoff
-in the parent vitae-db project for context.
+RenderContext plumbing, etc.) plus pending and audit items. Read
+`REQUIREMENTS.md` for the consolidated source of truth and the Seams section
+enumerating structural cuts. Read `engineering_principles.md` for the
+cross-project principles (P1 to P7) the project is built against.
 
 ## Layout
 
@@ -111,6 +118,9 @@ plant-sim render <lpy_file> [--t DOY] [--output DIR]
                                            .lpy → OBJ + materials sidecar
 plant-sim serve [--port 8000] [--host 127.0.0.1]
                                            dev server with live slider viewer
+plant-sim export <scene> [--scene] [--plant-list] [--format json|csv]
+                                           scene artifact and/or plant-list BOM
+                                           for downstream procurement (planned, V2.2)
 ```
 
 ## License

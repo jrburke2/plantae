@@ -3,12 +3,15 @@
 **Last updated:** 2026-05-02
 **Scope:** consolidates decisions across design doc v0.3.1, Phase 0 kickoff, Echinacea + Andropogon spike findings, OPEN_QUESTIONS, V2 browser-runtime plan, and architectural conversations through 2026-05-02.
 **Status legend:** ✅ shipped · 🔄 in progress · 📋 planned · ❓ open
+**Principles:** see `engineering_principles.md`. Entries are tagged with relevant principles `(P1)` to `(P7)` where the alignment is load-bearing.
 
 ---
 
 ## What plantae is
 
-An algorithmic plant simulator that lets non-technical contributors (botanists, naturalists) author species in plain YAML and renders them as continuous-time 3D specimens in a browser. Each specimen has a shareable seed (BOI-style — copy/paste/read aloud the same string anywhere to reproduce the same plant exactly). Communities of plants are built by sampling many specimens from a shared scene seed.
+An algorithmic plant simulator that lets non-technical contributors (botanists, naturalists) author species in plain YAML and renders them as continuous-time 3D specimens in a browser. The substrate is L-systems, the canonical biological-fractal formalism (Lindenmayer 1968): small recursive rule sets produce the self-similar structure plants actually exhibit. Each specimen has a shareable seed (BOI-style — copy/paste/read aloud the same string anywhere to reproduce the same plant exactly). Communities of plants are built by sampling many specimens from a shared scene seed. A user can select an arbitrary map shape and fill it with plants drawn from a species mix and density spec, reproducible from the scene seed.
+
+Plantae's scope ends at design and plant-list export. Procurement, supplier matching, and ecommerce live in a separable downstream product (related: Regional Native Plant Marketplace concept). Plantae produces portable exports (scene artifact for the design, plant-list BOM for procurement) that any compatible system can consume. Plant material is supported in both seed and transplant forms (plugs, containers, bare-root, B&B, etc.); form selection drives the BOM but not the rendering.
 
 Built on the OpenAlea ecosystem (L-Py + PlantGL) for Phase 0; planned migration to a browser-side runtime for V2 production.
 
@@ -52,11 +55,11 @@ Built on the OpenAlea ecosystem (L-Py + PlantGL) for Phase 0; planned migration 
 ### Viewer
 
 - **F22** ✅ Three.js viewer with OrbitControls + slider (DOY 1..366).
-- **F23** ✅ URL-driven (`?species=&seed=`); refreshable, shareable.
+- **F23** ✅ URL-driven (`?species=&seed=`); refreshable, shareable. `(P1, P6)`
 - **F24** ✅ Seed UI: prominent display, copy button, "new seed" button, paste-and-load input.
 - **F25** ✅ Visiting `/` generates a fresh random seed by default.
 - **F26** 📋 V2: viewer loads generated TS modules; calls `generate(seed, t_render)` directly.
-- **F27** 📋 Phase 5+: botanist-facing scene composition UI (taxonomy panel, reference photo, morphology checklist).
+- **F27** 📋 Phase 5+: botanist-facing **species-authoring UI** (taxonomy panel, reference photo, morphology checklist). Distinct from the scene composer in F42; this UI helps a botanist build a single species YAML, the F42 UI helps a user assemble a community scene from existing species.
 
 ### Seeds
 
@@ -75,27 +78,39 @@ Built on the OpenAlea ecosystem (L-Py + PlantGL) for Phase 0; planned migration 
 - **F37** 📋 Per-specimen seeds derived from a shared scene seed.
 - **F38** 📋 Three.js InstancedMesh for same-archetype duplicates.
 - **F39** 📋 Phase 3 target: ~500–2000 plants smooth in browser (with instancing + frame caching).
+- **F40** 📋 Scene boundary defined as an arbitrary 2D polygon. Coordinate format TBD (geographic lat/lon vs scene-local meters vs both); see OPEN_QUESTIONS. Auto-fill samples specimens to populate the polygon interior, governed by the species mix and density spec.
+- **F41** 📋 Key-specimen manual placement: user pins specific specimens at chosen positions within the scene boundary. Canonical case: large trees as canopy anchors placed before the matrix is auto-filled (depends on the `crown_tree` archetype landing in Phase 1, F6). Any species is eligible. Per-specimen seed is either derived from `(scene_seed, position)` by default or overridden inline (BOI-style "pin this exact specimen").
+- **F42** 📋 Scene composer UI: draw or import polygon, place key specimens on a basemap, configure species mix and densities, save to `scenes/<scene_name>.yaml`. Phase 5+ in current planning; the underlying scene-spec schema is needed earlier (Phase 3) so hand-authored YAML scenes work without the UI.
+
+### Plant output & export
+
+- **F43** 📋 Plant material form attribute on each species (overridable per specimen). Initial enum: `seed`, `plug`, `container_1gal`, `container_3gal`, `bare_root`, `B&B`, `bulb_corm_rhizome`, `cutting`. Schema encodes the allowed-form subset per species, since some species don't tolerate certain forms (taproot species like *Asclepias tuberosa* don't bare-root well; some sedges only establish reliably from plugs).
+- **F44** 📋 Use-case grade tag per species: `restoration_grade`, `ornamental_grade`, or both. Mirrors the marketplace concept's explicit split. Drives downstream sorting and substitution rules in procurement consumers.
+- **F45** 📋 Provenance attribute per species. Structured: ecoregion code (Bailey or EPA Level III/IV) plus optional origin lat/lon range. Enables ecotype-aware procurement downstream.
+- **F46** 📋 Scene export: portable artifact containing the polygon (GeoJSON or local-meters), the species mix and density spec, and the key specimens with positions and seeds. Lossless round-trip with `scenes/<scene_name>.yaml`. Format TBD; see OPEN_QUESTIONS. `(P6)`
+- **F47** 📋 Plant-list (BOM) export from a scene: computed `species × form × quantity` summary with form-appropriate quantity units (count for transplants; PLS lb/acre or weight for seed). JSON canonical, CSV adapter for spreadsheet users. The BOM is the procurement handoff artifact. `(P6)`
 
 ### CLI
 
-- **F40** ✅ `plant-sim validate <yaml>` — schema validation, fast feedback.
-- **F41** ✅ `plant-sim schema-json -o <path>` — emit JSON Schema for IDE.
-- **F42** ✅ `plant-sim generate <yaml> [--seed N|XYZ|random] [--output DIR]` — YAML → `.lpy`.
-- **F43** ✅ `plant-sim render <lpy_file> [--t DOY] [--output DIR]` — `.lpy` → OBJ + sidecar.
-- **F44** ✅ `plant-sim serve [--port N] [--host H]` — dev server + viewer.
+- **F48** ✅ `plant-sim validate <yaml>` — schema validation, fast feedback.
+- **F49** ✅ `plant-sim schema-json -o <path>` — emit JSON Schema for IDE.
+- **F50** ✅ `plant-sim generate <yaml> [--seed N|XYZ|random] [--output DIR]` — YAML → `.lpy`.
+- **F51** ✅ `plant-sim render <lpy_file> [--t DOY] [--output DIR]` — `.lpy` → OBJ + sidecar.
+- **F52** ✅ `plant-sim serve [--port N] [--host H]` — dev server + viewer.
+- **F53** 📋 `plant-sim export <scene> [--scene] [--plant-list] [--format json|csv] [--output DIR]` — emit scene artifact and/or BOM for downstream procurement systems.
 
 ### CI / build pipeline
 
-- **F45** ✅ `.github/workflows/tests.yml` — pytest on every push and PR.
-- **F46** ✅ `.github/workflows/render.yml` — generate + render + comment on PRs that touch species/templates/codegen/materials.
-- **F47** 📋 V2.3+: replace bake-on-PR with TS module build; static deploy to CDN.
+- **F54** ✅ `.github/workflows/tests.yml` — pytest on every push and PR.
+- **F55** ✅ `.github/workflows/render.yml` — generate + render + comment on PRs that touch species/templates/codegen/materials.
+- **F56** 📋 V2.3+: replace bake-on-PR with TS module build; static deploy to CDN.
 
 ---
 
 ## Architectural Requirements (locked decisions)
 
-- **A1** ✅ **L-Py + OpenAlea** as Phase 0 substrate. Validated by Echinacea spike (+9) and Andropogon spike (4/4 PASS).
-- **A2** ✅ **OBJ + JSON sidecar export** (not glTF). PlantGL has no glTF codec — `Cannot find codec to write scene`. Bridge: `Shape.id → "o SHAPE_<id>"` group → three.js `mesh.name` → sidecar lookup → material library.
+- **A1** ✅ **L-Py + OpenAlea** as Phase 0 substrate. L-systems are the canonical biological-fractal formalism: small recursive rule sets produce the self-similar structure plants exhibit at every scale (branch, leaf, shoot, organ). Validated by Echinacea spike (+9) and Andropogon spike (4/4 PASS).
+- **A2** ✅ **OBJ + JSON sidecar export** (not glTF). PlantGL has no glTF codec — `Cannot find codec to write scene`. Bridge: `Shape.id → "o SHAPE_<id>"` group → three.js `mesh.name` → sidecar lookup → material library. `(P6)`
 - **A3** ✅ **Y-up, right-handed, origin at geometric base** of the plant. Matches three.js + glTF defaults.
 - **A4** ✅ **Meters as canonical internal length unit.** Codegen converts species-declared units to meters at .lpy emission.
 - **A5** ✅ **Configurable length unit per species YAML.** Built-in units: m, cm, mm, in, ft, yd. Inline custom units: `{name, meters_per_unit}`. Programmatic registration: `register_length_unit(...)`.
@@ -110,9 +125,37 @@ Built on the OpenAlea ecosystem (L-Py + PlantGL) for Phase 0; planned migration 
 - **A14** ✅ **`extra="forbid"` on every Pydantic model.** YAML typos error loudly instead of silently passing.
 - **A15** ✅ **Strict `age > 0` filter in exporter.** Matches `sigmoid_grow(0, ...) → 0` boundary; PlantGL omits zero-extent geometry.
 - **A16** 📋 **V2: PCG-XSL-RR-128/64 portable PRNG** in both Python and TypeScript. Replaces Mersenne Twister; same seed produces bit-identical sequences cross-runtime.
-- **A17** 📋 **V2: Browser-side generation as production architecture.** Codegen emits TypeScript modules; browser runs algorithm directly. Server kept as dev/research tool. See V2_BROWSER_RUNTIME_PLAN.
-- **A18** 📋 **V2: Hierarchical seed derivation** via `Seed.derive(parent, salt)`. BOI-style world → specimen → organ. Hash function (likely BLAKE3-truncated) explicitly locked for cross-runtime parity.
+- **A17** 📋 **V2: Browser-side generation as production architecture.** Codegen emits TypeScript modules; browser runs algorithm directly. Server kept as dev/research tool. See V2_BROWSER_RUNTIME_PLAN. `(P4)`
+- **A18** 📋 **V2: Hierarchical seed derivation** via `Seed.derive(parent, salt)`. BOI-style world → specimen → organ; the same operation applied recursively at every scale, a fractal of identity. Hash function (likely BLAKE3-truncated) explicitly locked for cross-runtime parity.
 - **A19** 📋 **V2: Template versioning surfaced everywhere.** Generated artifacts and viewer display the template version that produced them; users see "this seed in template v1.2.0."
+
+---
+
+## Seams
+
+Seams are tensions in the system resolved by finding a useful boundary between two related-but-distinct things, or that are still being worked. Each entry carries the sides, the cut, the rationale, and references to the F/A/NF/OPEN_QUESTIONS entries that embody it. Status: ✅ resolved, 🔄 active. Resolved seams stay in this list since the cut and rationale remain useful long after the decision.
+
+- **S1** ✅ **Plantae ↔ marketplace.** Sides: design tool / procurement product. Cut: plantae produces a portable plant-list BOM and stops; marketplace consumes the BOM and handles supplier matching, pricing, ecommerce, regulatory compliance. Rationale: ecommerce non-functional requirements (PCI, sales tax, regulatory variance, live-plant returns) are heavy and orthogonal to the algorithmic core. Refs: F46, F47; OPEN_QUESTIONS "Plantae and marketplace separation." `(P7)`
+
+- **S2** ✅ **Botanist ↔ developer contributor.** Sides: non-coding species author / template and codegen author. Cut: YAML files at `species/<family>/<genus_species>.yaml` (botanist surface) vs Jinja2 templates at `templates/archetypes/` and Python codegen (developer surface). Rationale: lower the contributor floor for species addition without sacrificing architectural rigor for new archetypes. Refs: F1, F4, F5, F12; CONTRIBUTING_botanist.md and CONTRIBUTING_developer.md.
+
+- **S3** ✅ **Generation ↔ rendering.** Sides: lstring production (one `derive()` per species+seed, cached in memory) / geometry interpretation (re-runs at every T_RENDER tick). Cut: the cached lstring is the hand-off; PlantGL and three.js never see the L-system. Rationale: continuous-time slider scrub demands cheap re-interpretation; expensive derivation amortizes once per (species, seed). Refs: F14, F15.
+
+- **S4** ✅ **Species-authoring UI ↔ scene-composer UI.** Sides: build a single species YAML / assemble a community scene from existing species. Cut: distinct UIs in distinct phases; F27 owns species-authoring (taxonomy panel, reference photo, morphology checklist), F42 owns scene-composer (polygon, key specimens, density spec). Rationale: single-species and community workflows have different mental models, inputs, and basemap needs. Refs: F27, F42; OPEN_QUESTIONS scene-polygon Q6 (resolved 2026-05-02).
+
+- **S5** 🔄 **L-Py runtime ↔ TypeScript runtime.** Sides: dev/research substrate (Phase 0 onward) / production substrate (V2.3+). Cut: codegen emits both targets through the V2.0–V2.3 transition; cross-runtime parity test in CI; production cutover at V2.3. L-Py path retained post-cutover for research and faster archetype prototyping. Rationale: 1.1T-seed BOI-style UX requires browser-side generation; OpenAlea-model compatibility benefits from server L-Py. Refs: A1, A16, A17, A18; V2_BROWSER_RUNTIME_PLAN.md. `(P4)`
+
+- **S6** 🔄 **Geographic coordinates ↔ local-meters coordinates.** Sides: lat/lon polygons for basemap UX and public-dataset composability / scene-local meters for canonical internal unit and zero projection math. Cut: schema accepts both with explicit flag; loader projects geographic input into local meters at scene-load using flat-earth approximation centered on polygon centroid. Rationale: <10km scenes don't suffer projection distortion meaningfully; UX wants geographic; runtime wants meters. Refs: A4, F40; OPEN_QUESTIONS scene-polygon Q1 (lean: option c).
+
+- **S7** 🔄 **Restoration-grade ↔ ornamental-grade.** Sides: function-first restoration use (PLS lb/acre, ecotype-strict, contractor purchasers) / aesthetic-first ornamental use (specimen quality, looser provenance, retail purchasers). Cut: per-species `grade` tag (`restoration_grade`, `ornamental_grade`, or both); drives downstream sorting and substitution rules in procurement consumers. Rationale: marketplace concept treats this as a defensible positioning leg; both customer segments need first-class support. Refs: F44; marketplace concept "Use-case clarity."
+
+- **S8** 🔄 **Regional ecotype ↔ broader supply.** Sides: locally-adapted source material (genetic provenance from the planting region) / broadly-sourced material (often nationally distributed, lower regional fitness). Cut: `provenance` attribute on species (ecoregion code plus optional origin lat/lon range); BOM consumers can filter or weight by provenance match. Rationale: native-plant ecology depends on local adaptation; ecotype provenance is a real differentiator and the marketplace's defensible position. Refs: F45; marketplace concept "Provenance" and "Geography and ecotype focus."
+
+- **S9** 🔄 **Static-first ↔ dynamic-required.** Sides: shippable as static files with no server, no auth, no live data (plantae V2.3+ target) / requires live data, transactions, auth (marketplace by nature). Cut: plantae ships static; marketplace operates dynamic; schema layer is shared, runtime layers are not. Rationale: plantae's user is browsing reproducible art; marketplace's user is transacting on live inventory. Refs: NF14; marketplace concept "Plantae integration." `(P3, P4)`
+
+- **S10** 🔄 **Phase 0/1 algorithm correctness ↔ V2 production architecture.** Sides: prove the algorithmic substrate (L-Py, persistent-marker, archetype expansion, contributor pathway) / ship a production runtime (TS browser-side, PCG portable PRNG, parity tests, CDN deploy). Cut: in transition (V2.0 to V2.3); both runtimes coexist; cutover at V2.3. Needs explicit naming of what stays in each side and what crosses (data formats, schema, parity tests, doc audience, CI gates) when V2 work begins. Refs: V2_BROWSER_RUNTIME_PLAN.md; A16-A19; "Done criteria — V2."
+
+- **S11** ✅ **Specimen ↔ community.** Sides: single-plant rendering (deep, accurate, sub-100ms scrub) / community rendering (many specimens, instancing, per-specimen seed derivation). Cut: scene seed at the community level; per-specimen seeds derived via `Seed.derive(parent, salt)`; three.js InstancedMesh for same-archetype duplicates. The seam recurs at community ↔ landscape (Phase 4+, NF4) using the same operator. Rationale: single-specimen quality demands per-instance fidelity; community scale demands sharing; same algorithm applies at every scale. Refs: F31, F36-F42; A18.
 
 ---
 
@@ -230,6 +273,12 @@ Tracked in detail in `OPEN_QUESTIONS.md`. Summary:
 - ❓ **Mobile performance** — needs measurement before V2.3 ships.
 - ❓ **Per-specimen material variation** — Phase 4+ ecology problem; logged so it's not a surprise.
 - ❓ **Scene composer UX for botanists** — Phase 5+ product question.
+- ❓ **Scene polygon coordinate format** — geographic (lat/lon, GeoJSON) vs scene-local meters vs both. Drives basemap UX, projection math, and YAML schema. See OPEN_QUESTIONS.
+- ❓ **Auto-fill placement algorithm** — Poisson disk vs grid jitter vs per-species density rules; how key-specimen positions interact (exclusion zones, density falloff under canopy).
+- ❓ **Key-specimen seed semantics** — derive from `(scene_seed, position)` by default; allow inline override for "pin this exact specimen." Confirm both paths in schema.
+- ❓ **Plant material form enum and allowed-form subsets per species** — canonical enum locked above; per-species allowed sets need encoding in schema.
+- ❓ **BOM quantity semantics by form** — count for transplants is easy; seed is PLS lb/acre or weight or both; sometimes both forms are reported as alternatives for the same line item.
+- ❓ **Export format** — JSON canonical, CSV adapter for the BOM. Scene artifact format TBD (probably JSON-with-embedded-GeoJSON; possibly `.plantae-scene` suffix).
 
 ---
 

@@ -24,6 +24,14 @@ shared `growth_functions/` module, avoid L-Py-specific syntax beyond the
 documented set, document any L-Py idiom that would be hard to express
 imperatively. The TS template-authoring guide will land alongside V2.1.
 
+**Reference docs:** REQUIREMENTS.md (single source of truth, includes the
+Seams section enumerating S1–S11), OPEN_QUESTIONS.md (architectural
+decisions resolved and pending), engineering_principles.md (cross-project
+P1–P7 the project is built against). The Seams section in particular is
+worth scanning before opening a PR that touches a structural boundary; if
+your change crosses a seam, the seam's "cut" and "rationale" tell you
+what's load-bearing on either side.
+
 ## Setup
 
 ```bash
@@ -348,3 +356,6 @@ deps; subsequent runs use the cached env.
 | Understand the unit-system design                | `OPEN_QUESTIONS.md` Step 2 entries                   |
 | Understand why server uses a single thread       | `plant_sim/server/app.py` comments                   |
 | Understand the spike findings (substrate choice) | parent vitae-db `spike/lpy_spike_kit/FINDINGS.md`    |
+| Understand the engineering principles            | `engineering_principles.md`                          |
+| Understand a structural boundary or seam         | `REQUIREMENTS.md` Seams section (S1–S11)             |
+| Understand the V2 transition                     | `V2_BROWSER_RUNTIME_PLAN.md`; seams S5, S9, S10      |

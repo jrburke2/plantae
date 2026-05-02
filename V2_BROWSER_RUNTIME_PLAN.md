@@ -17,6 +17,10 @@ generation as the long-term runtime, after concluding that:
    a server** is "the algorithm runs on the user's device" — same model as
    *Binding of Isaac: Rebirth* and similar procedural games.
 
+**Cross-references:**
+- REQUIREMENTS.md captures the V2 functional requirements (F13, F17, F26, F35, F50, F53), architectural decisions (A16-A19), and the V2-relevant seams (S5 L-Py↔TS runtime, S9 static-first↔dynamic, S10 Phase 0/1 algorithm correctness↔V2 production architecture).
+- engineering_principles.md frames the V2 transition as primarily a P4 (minimum runtime cost on user's machine) move with P5 (determinism) load-bearing for cross-runtime parity.
+
 ---
 
 ## 1. TL;DR
@@ -229,11 +233,16 @@ server for a fixed test set.
 
 - [ ] Author `templates/archetypes/tiller_clump.ts.j2`
 - [ ] Both reference species render in browser
-- [ ] Implement scene/community spec:
+- [ ] Implement scene/community spec (REQUIREMENTS F36, F40-F42):
   ```yaml
   # scenes/midwest_mesic_prairie.yaml
   scene_id: midwest_mesic_prairie
-  bounds_m: [50, 50]
+  # F40: arbitrary 2D polygon, geographic or local-meters (see OPEN_QUESTIONS scene-polygon Q1)
+  bounds:
+    type: local_meters_polygon
+    points: [[0,0], [50,0], [50,50], [0,50]]
+  # F41: optional manual placement of key specimens before auto-fill
+  key_specimens: []
   populations:
     - species: andropogon_gerardii
       density_per_m2: 0.5
@@ -243,12 +252,15 @@ server for a fixed test set.
       placement: poisson_disk
   ```
 - [ ] Scene composer takes a scene_yaml + scene_seed → list of
-      `(species, position, derived_seed)` placements
+      `(species, position, derived_seed)` placements (F37)
 - [ ] Browser renders each placement using the existing TS species modules
 - [ ] Test community of 100 specimens — measure FPS, browser memory
+- [ ] Implement scene + BOM export (REQUIREMENTS F46, F47, F53; CLI subcommand `plant-sim export`)
+- [ ] Lstring caching keyed on `(species_yaml_hash, seed)` (OPEN_QUESTIONS audit item c)
 
 **Checkpoint:** a 100-plant prairie scene renders in browser at >30 fps from
-a single shared scene seed.
+a single shared scene seed; `plant-sim export <scene> --plant-list` emits a
+species × form × quantity BOM consumable by downstream procurement systems.
 
 ### V2.3 — Production cutover (~2 weeks)
 
@@ -315,14 +327,20 @@ V2 is complete when, on a fresh checkout / web visit:
 7. Same template + same seed produces visually-identical plants between
    server (dev) and browser (production)
 8. CI publishes new TS modules to CDN within 5 min of YAML/template merge
+9. `plant-sim export <scene>` emits a portable scene artifact and a
+   plant-list BOM (`species × form × quantity`) consumable by downstream
+   procurement systems (REQUIREMENTS F46, F47, F53)
 
 ---
 
 ## 8. Open questions
 
 1. **TS bundler choice.** ESM modules with no build step (current viewer
-   pattern) vs Vite/esbuild for tree-shaking and minification. Probably
-   esbuild — small, fast, no dev-server needed.
+   pattern) vs Vite/esbuild for tree-shaking and minification. OPEN_QUESTIONS
+   audit item (e) revisits this through the principle lens (P3, minimum tool
+   surface): the current lean toward esbuild may not survive that scrutiny.
+   Likely path: no-build ESM through V2.0 and V2.1, adopt esbuild only when
+   bundle pain is concrete.
 2. **Web Worker isolation.** Should `generate()` run in a Web Worker so
    the main thread stays responsive during slider scrubs? Probably yes for
    community renders >50 specimens, no for single-specimen.

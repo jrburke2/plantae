@@ -2,6 +2,8 @@
 
 Running list of decisions deferred during Phase 0. Resolve in Phase 1+ unless they block.
 
+**Principles:** see `engineering_principles.md`. New questions evaluate proposals against P1-P7 explicitly where alignment is non-obvious.
+
 ---
 
 ## Step 0 — Export format decision (RESOLVED 2026-05-02)
@@ -107,6 +109,21 @@ Templates compute effective phenology as `<event>_doy + EMERGENCE_OFFSET` before
 
 ---
 
+## Discussion 2026-05-02 — Plantae and marketplace separation (RESOLVED)
+
+**Q:** Should plantae itself become the ecommerce engine for plant procurement, or hand off to a separable downstream product?
+
+**A:** Hand off. Plantae's scope ends at design and plant-list export. Procurement, supplier matching, payment processing, sales tax, shipping logistics, and regulatory compliance (cross-state live-plant shipping permits, etc.) all live in a separable downstream product (related: Regional Native Plant Marketplace concept). Plantae produces portable exports (scene artifact, plant-list BOM) that any compatible procurement system can consume.
+
+**Why:** The non-functional requirements of running real ecommerce (PCI compliance, sales tax in 50 states, plant-shipping regulatory variance, refund/replacement guarantees on live plant material, live inventory feeds from growers) are heavy and orthogonal to plantae's algorithmic core. Keeping the boundary clean lets the simulator stay simple and lets the marketplace product evolve independently. A user can take their plant list elsewhere if they want to.
+
+**Implications:**
+- Plantae's species YAML schema gains form, grade, and provenance attributes (F43–F45) so the export carries enough information to be useful downstream.
+- The export function (F47) is the contract surface; format is locked once, evolved with versioning.
+- Marketplace integration (cart import, deep links, etc.) is a marketplace-product concern, not a plantae feature. If plantae-marketplace co-evolution wants tighter UX, that lives in shared schema, not shared code.
+
+---
+
 ## Pending — Per-specimen material variation
 
 **Q:** Sun-leaves vs shade-leaves, microhabitat color shifts. Currently `material_id` is baked at codegen time per species, not per specimen. Phase 4+ ecology problem; logged so it's not a surprise.
@@ -122,3 +139,110 @@ Locked in `templates/archetypes/README.md` as: Y-up, right-handed, origin at geo
 ## Pending — Lstring caching
 
 `derive()` is 1-10 ms; multi-specimen scenes will call it 100s of times. Server-side memoization keyed on `(species_yaml_hash, seed)` is required for Phase 3 and trivial to add in Step 7. Not building yet.
+
+---
+
+## Pending — Scene polygon and key-specimen placement schema (NEW 2026-05-02)
+
+Driven by F40–F42 in REQUIREMENTS. Communities need a concrete scene-spec format before Phase 3. Several sub-questions:
+
+**Q1: Polygon coordinate format.**
+Three candidates:
+- (a) Geographic (lat/lon, likely GeoJSON `Polygon` or `MultiPolygon`). Pros: maps directly to user intent ("outline this prairie remnant on a basemap"); composable with public datasets (parcel boundaries, NLCD tiles, restoration footprints). Cons: forces a projection step at scene-load time; non-trivial math at the polygon edges if the scene is large enough for projection distortion to matter (probably not for restoration-scale work, but flag).
+- (b) Scene-local meters (the canonical internal unit per A4). Pros: zero projection math; matches everything downstream. Cons: divorced from real-world geography; user has to translate from a basemap manually.
+- (c) Both, with a flag in the YAML. Pros: lets researchers pick. Cons: doubles the schema surface and the test matrix.
+
+**Lean:** (c) but with (a) as the recommended path for the scene composer UI (F42), and (b) as the unadorned researcher path. The scene loader projects (a) into local meters at load time using a flat-earth approximation centered on the polygon centroid (good enough for <10 km scenes).
+
+**Q2: Auto-fill placement algorithm.**
+Density spec is per-species (e.g., `Andropogon gerardii: 4 plants/m²`). Candidates:
+- Poisson disk sampling (spatial blue noise). Most ecologically plausible at moderate densities; minimum-distance constraint avoids visual clumping artifacts.
+- Per-species density × polygon area, placed via grid jitter. Simpler; clumping more visible.
+- Cluster + matrix mix (e.g., Echinacea in clusters, grasses uniform). Realistic but adds parameters.
+
+**Lean:** Poisson disk per species, then composite. Defer cluster behavior to Phase 4+.
+
+**Q3: Key-specimen interaction with auto-fill.**
+When a user pins a 12 m oak in the middle of a polygon, the auto-fill should probably not place dense grass directly under the trunk. Two implementation strata:
+- (a) Geometric exclusion only — auto-fill skips a circle of radius `r` around each key specimen. Cheap and dumb; user-tunable.
+- (b) Ecological exclusion — density falloff that varies by species pair (e.g., grass density drops under tree canopy, woodland species rise). This is real Phase 4+ light-competition territory and shouldn't gate F41.
+
+**Lean:** ship (a) for V2.2; (b) waits for Phase 4+.
+
+**Q4: Key-specimen seed semantics.**
+- Default: derive per-specimen seed from `(scene_seed, position_x, position_y, species)` so the same scene seed always produces the same oak in the same spot.
+- Override: allow `key_specimens: [{species, position, seed: "XQF2D6S1"}]` for the BOI-style "I love this exact specimen, pin it across scenes" pattern.
+
+Both should be supported. The default keeps reproducibility automatic; the override gives the seed-curation crowd what they want.
+
+**Q5: Coordinate system for key specimens.**
+Must match polygon coordinate system from Q1. If the scene YAML uses geographic polygon, key-specimen positions are lat/lon; if local meters, key specimens are local meters. Mixed mode is forbidden in the schema.
+
+**Q6: Documentation muddle to fix.**
+F27 in REQUIREMENTS mentions a "scene composition UI" but the description (taxonomy panel, reference photo, morphology checklist) is actually the species-authoring UI, not the scene composer. F27 should be split into F27 (species-authoring UI) and F42 (scene composer UI, now added). Done in this revision.
+
+---
+
+## Pending — Plant output and export schema (NEW 2026-05-02)
+
+Driven by F43–F47 in REQUIREMENTS, which add plant-material attributes and the export contract that hands off to procurement systems. Plantae-marketplace boundary now resolved (see RESOLVED section above). Outstanding sub-questions:
+
+**Q1: Plant material form enum, locked.**
+Initial set: `seed`, `plug`, `container_1gal`, `container_3gal`, `bare_root`, `B&B`, `bulb_corm_rhizome`, `cutting`. Open: do we need a `bareroot_grade` distinction (seedling vs liner vs landscape-size for woody species)? Probably yes for trees, no for forbs. Phase 1 lock the eight; revisit when `crown_tree` lands.
+
+**Q2: Allowed-form subset per species.**
+Some species don't tolerate certain forms (taproot species poorly bare-rooted, certain sedges plug-only). Schema needs `allowed_forms: [enum, ...]` per species, not just a single default. Default form per species is also useful (e.g., for *Andropogon gerardii* default to `seed` for restoration grade, `plug` for ornamental).
+
+**Q3: BOM quantity semantics by form.**
+- Counts for transplants is straightforward. One *Quercus alba* B&B is one tree.
+- Seed needs more care: PLS lb/acre is the standard for restoration drills; broadcast rate may differ; ornamental seed may be sold by the packet/oz. The BOM should report the natural unit per form. Mixed-species seed mixes complicate this since the consumer typically wants total mix weight + per-species PLS percentages, not raw species weights.
+- Possible alternative-form reporting: when a scene calls for 5000 little bluestem, the BOM could surface `seed: X lb PLS` AND `plug: 5000 plugs` so the consumer picks based on availability and budget. Maybe a flag.
+
+**Q4: Export format.**
+- BOM canonical: JSON. Schema versioned. CSV adapter for spreadsheet users.
+- Scene artifact: JSON with embedded GeoJSON polygon + key-specimen feature collection + species mix and density spec. Suggested suffix `.plantae-scene.json`.
+- Versioning: every export carries `plantae_version`, `scene_schema_version`, `template_versions: {species: version, ...}` so a procurement consumer knows what it's looking at.
+
+**Q5: Substitution semantics.**
+Marketplace concept distinguishes restoration-grade from ornamental-grade. If a species in the BOM is unavailable from any supplier in the consumer's region, the marketplace may want to substitute. Substitution is a marketplace concern, but plantae's grade tag (F44) and provenance tag (F45) are the inputs. Consider whether plantae should also emit substitution hints (e.g., "if *Schizachyrium scoparium* is unavailable, accept *Andropogon gerardii*") or leave that purely to the marketplace.
+
+**Q6: Phase placement.**
+- F43, F44, F45 (species attributes) land in Phase 1 alongside the new archetypes — additive YAML schema work.
+- F46, F47, F53 (exports + CLI subcommand) land alongside the scene spec, V2.2 territory.
+- No marketplace-side work in plantae roadmap. The marketplace product owns its own roadmap.
+
+---
+
+## Pending — Audit against engineering principles (NEW 2026-05-02, early reads)
+
+Five items surfaced from a pass through REQUIREMENTS and OPEN_QUESTIONS against `engineering_principles.md`. All are **early reads, not decisions** — they're proposals to be argued, refined, or rejected. Logged here so they don't fall through the cracks.
+
+### a. Scene composer UI (F42) phasing
+
+Currently parked at Phase 5+. P1 (deep usability at every facet) suggests earlier. Communities ship at Phase 3 and would stay hand-authored YAML-only until Phase 5+, which is years of community-rendering capability without the polygon UI that makes it usable for non-technical users (designers, contractors, restoration coordinators). Counter: hand-authored YAML works; researchers and developers can produce scenes without the UI; UI is a contributor-experience improvement, not a blocker for core capability.
+
+**Early read:** move F42 to Phase 3 alongside community rendering, since that's when scenes become a user-facing concept rather than a developer-facing one. Phase 5+ is the right slot only if early users will all be technical, which contradicts the design-to-procurement vision.
+
+### b. Scene artifact (F46) vs scene YAML (F36) duplication
+
+F46 describes a portable scene artifact distinct from `scenes/<scene_name>.yaml` in F36. P2 (minimum architectural complexity) suggests these may be the same artifact under two names. The YAML is already portable, diffable, versionable, and built on open formats (P6). A distinct "scene artifact" export with a separate format adds a schema layer that earns nothing the YAML doesn't already deliver. Counter: the YAML might evolve to carry developer-facing fields (template overrides, generator hints, debug annotations) that aren't appropriate for the procurement-side artifact; distinct schemas keep concerns separate.
+
+**Early read:** the YAML is the scene artifact at a single shared schema. F46 collapses to "CLI ergonomics around the YAML" rather than introducing a new artifact format. If developer-facing fields appear later, scope them with a `_dev` namespace inside the YAML, don't fork the format.
+
+### c. Lstring caching priority
+
+Currently logged as Phase 3 prerequisite, "trivial to add in Step 7. Not building yet." S11 (specimen ↔ community seam) makes lstring caching load-bearing for community work, and ~100 to ~2000 derives at 1-10ms each (NF3 target) is exactly the runtime cost P4 puts downward pressure on. Counter: premature work before the community use case lands; the cache shape might need to differ once we see real access patterns.
+
+**Early read:** no change to actual sequencing, but elevate the status from "deferred" to "build alongside the first multi-specimen render in Phase 3" so it doesn't get forgotten as a forcing function for the community render to feel right. The trivial implementation noted (memoization keyed on `(species_yaml_hash, seed)`) is probably the right starting shape.
+
+### d. glTF revisit for V2 / landscape scale
+
+A2 chose OBJ + JSON sidecar because PlantGL had no glTF codec. The constraint is irrelevant in V2 (no PlantGL). Currently OBJ + JSON wins on P3 (no extra dep, parsers are commodities) and P6 (two open formats). At landscape scale (Phase 4+, NF4 1000+ plants), native glTF instancing (KHR_mesh_instancing) may win on P4 against three.js InstancedMesh-of-OBJ-geometry, since the format itself can encode instances natively rather than the renderer reconstructing them. Counter: not yet, community-scale renders haven't proven the perf problem; switching exporters mid-stream is real cost.
+
+**Early read:** stay OBJ + JSON through V2.3. Re-evaluate at Phase 4+ when landscape rendering starts struggling. The decision tree is cleaner now (PlantGL constraint gone), so a future re-evaluation will be quick if perf data forces it.
+
+### e. V2 bundler choice through the principle lens
+
+OPEN_QUESTIONS leans esbuild over Vite over no-build ESM. P3 (minimum dependency and tool surface) suggests revisiting. No-build raw ESM is zero build tooling; the plantae viewer already runs no-build with native browser imports. esbuild earns its way only when bundle composition or size becomes a real constraint. Counter: V2.2+ communities and species catalog growth may want code splitting and compression that ESM-direct can't offer; the V2 done criterion of <2 MB compressed (V2 §7.6) probably needs a bundler at scale.
+
+**Early read:** no-build raw ESM through V2.0 and V2.1, prove cross-runtime parity and the algorithm port without bundler complexity. Adopt esbuild only when bundle pain is concrete (sizes approaching 2 MB, or HTTP/2 multiplexing not absorbing the request count). P3 says deps earn their way; bundler doesn't earn its way prophylactically.
