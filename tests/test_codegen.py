@@ -1,22 +1,17 @@
-"""Codegen tests for Step 3.
+"""Codegen tests.
 
-Verifies:
-- The rosette_scape_composite template renders without error against the
-  Echinacea YAML.
-- The generated .lpy file loads in L-Py.
-- Derivation runs to completion and produces the expected queryable
-  marker modules (RosetteLeaf, Scape, InfloHead) in the final lstring.
-- sceneInterpretation at peak DOY produces a non-empty Scene.
-- sceneInterpretation BEFORE leaf flush produces zero shapes
-  (age-aware geometry working).
+Generic codegen-pipeline invariants are parametrized over the reference
+archetypes so a regression in any archetype shows up here. Archetype-
+specific tests (template body strings, module census, material
+distribution) live in their own sections below.
 
-The persistent-marker pattern is verified by counting marker modules
-in the final lstring (Andropogon spike's load-bearing test pattern,
-applied to the new rosette_scape_composite archetype).
+Add a new archetype: append a row to ARCHETYPES; the generic suite
+picks it up automatically.
 """
 
 from __future__ import annotations
 
+import json
 from collections import Counter
 from pathlib import Path
 
@@ -32,29 +27,207 @@ from plant_sim.codegen.generator import (
     render_archetype,
     write,
 )
+from plant_sim.codegen.validator import validate_lpy
+from plant_sim.render.derive import derive
+from plant_sim.render.export import export_to_obj_with_sidecar
 from plant_sim.schema.render_context import RenderContext
+from plant_sim.schema.seed import Seed
 from plant_sim.schema.species import Species
 
 REPO = Path(__file__).resolve().parent.parent
-ECHINACEA_YAML = REPO / "species" / "asteraceae" / "echinacea_purpurea.yaml"
+
+
+# ---- Reference archetypes ----
+
+_ECHINACEA_ARCH = {
+    "yaml": "species/asteraceae/echinacea_purpurea.yaml",
+    "scientific_name": "Echinacea purpurea",
+    "archetype": "rosette_scape_composite",
+    "template_suffix": "rosette_scape_composite.lpy.j2",
+    "filename_stem": "echinacea_purpurea",
+    "real_material_id": "ray_floret_purple",
+}
+_ANDROPOGON_ARCH = {
+    "yaml": "species/poaceae/andropogon_gerardii.yaml",
+    "scientific_name": "Andropogon gerardii",
+    "archetype": "tiller_clump",
+    "template_suffix": "tiller_clump.lpy.j2",
+    "filename_stem": "andropogon_gerardii",
+    "real_material_id": "panicle_bronze",
+}
+ARCHETYPES = [
+    pytest.param(_ECHINACEA_ARCH, id="echinacea"),
+    pytest.param(_ANDROPOGON_ARCH, id="andropogon"),
+]
+
+
+@pytest.fixture(scope="module", params=ARCHETYPES)
+def arch(request) -> dict:
+    return request.param
 
 
 @pytest.fixture(scope="module")
+def lpy_text(arch) -> str:
+    sp = Species.from_yaml(REPO / arch["yaml"])
+    return render_archetype(sp, RenderContext(seed=42))
+
+
+@pytest.fixture(scope="module")
+def lpy_path(tmp_path_factory, arch, lpy_text) -> Path:
+    p = tmp_path_factory.mktemp(f"gen_{arch['filename_stem']}") / f"{arch['filename_stem']}_seed_42.lpy"
+    p.write_text(lpy_text)
+    return p
+
+
+# ---- Generic codegen invariants (parametrized over archetypes) ----
+
+def test_archetype_registered(arch):
+    assert arch["archetype"] in available_archetypes()
+
+
+def test_load_species_returns_species_object(arch):
+    sp = load_species(REPO / arch["yaml"])
+    assert isinstance(sp, Species)
+    assert sp.scientific_name == arch["scientific_name"]
+
+
+def test_dispatch_template_uses_archetype(arch):
+    sp = load_species(REPO / arch["yaml"])
+    assert dispatch_template(sp).endswith(arch["template_suffix"])
+
+
+def test_externs_declared(lpy_text):
+    for name in (
+        "T_RENDER", "SPECIMEN_SEED", "TIME_OFFSET_DOY",
+        "EMERGENCE_OFFSET", "POSITION_X_M", "POSITION_Y_M", "POSITION_Z_M",
+    ):
+        assert f"extern({name}" in lpy_text, f"missing extern({name}=...)"
+
+
+def test_generated_lpy_passes_static_validator(lpy_text):
+    issues = validate_lpy(lpy_text, raise_on_error=False)
+    errors = [i for i in issues if i.severity == "error"]
+    assert errors == [], f"validator caught issues: {errors}"
+
+
+def test_lpy_loads_and_derives(lpy_path):
+    lsys, lstring = derive(lpy_path, RenderContext(seed=42))
+    assert len(lstring) > 0
+
+
+def test_scene_at_peak_is_nonempty(lpy_path):
+    from openalea.lpy import Lsystem
+    lsys = Lsystem(str(lpy_path))
+    lstring = lsys.derive()
+    lsys.context()["T_RENDER"] = 250.0
+    scene = lsys.sceneInterpretation(lstring)
+    assert len(scene) > 0, "scene at peak DOY should have shapes"
+
+
+def test_scene_before_leaf_flush_is_empty(lpy_path):
+    """T_RENDER < phenology onset: every renderable's age is negative; nothing emits."""
+    from openalea.lpy import Lsystem
+    lsys = Lsystem(str(lpy_path))
+    lstring = lsys.derive()
+    lsys.context()["T_RENDER"] = 50.0
+    scene = lsys.sceneInterpretation(lstring)
+    assert len(scene) == 0, f"expected 0 shapes pre-flush, got {len(scene)}"
+
+
+def test_render_at_peak_via_exporter(tmp_path: Path, arch, lpy_path):
+    """Exporter must round-trip lstring → OBJ + sidecar without raising."""
+    lsys, lstring = derive(lpy_path, RenderContext(seed=42))
+    obj_path = tmp_path / f"{arch['filename_stem']}.obj"
+    out_obj, out_sidecar = export_to_obj_with_sidecar(lsys, lstring, 250.0, obj_path)
+    assert out_obj.exists() and out_sidecar.exists()
+
+
+def test_render_pre_flush_via_exporter(tmp_path: Path, arch, lpy_path):
+    lsys, lstring = derive(lpy_path, RenderContext(seed=42))
+    obj_path = tmp_path / f"{arch['filename_stem']}_preflush.obj"
+    _, out_sidecar = export_to_obj_with_sidecar(lsys, lstring, 50.0, obj_path)
+    sidecar = json.loads(out_sidecar.read_text())
+    assert sidecar["meta"]["scene_shape_count"] == 0
+
+
+def test_generate_with_seed_changes_stochastic_draws(arch):
+    sp = load_species(REPO / arch["yaml"])
+    src_a = generate(sp, seed=42)
+    src_b = generate(sp, seed=43)
+    assert "SPECIMEN_SEED = 42" in src_a
+    assert "SPECIMEN_SEED = 43" in src_b
+
+
+def test_write_uses_content_addressed_filename(arch, tmp_path: Path):
+    """Filenames embed the canonical 8-char base32 seed (not raw int)."""
+    sp = load_species(REPO / arch["yaml"])
+    path = write(sp, output_dir=tmp_path, seed=4711)
+    canonical = Seed(4711).canonical()
+    assert path.name == f"{arch['filename_stem']}_seed_{canonical}.lpy"
+    assert path.exists()
+    if arch["archetype"] == "rosette_scape_composite":
+        # Echinacea: extern still carries the int form
+        assert f"SPECIMEN_SEED = {4711}" in path.read_text()
+
+
+# ---- One-off codegen invariants (no need to parametrize) ----
+
+def test_dispatch_template_honors_override(tmp_path: Path):
+    sp_text = (REPO / _ECHINACEA_ARCH["yaml"]).read_text() + "\ntemplate_override: my/custom/foo.lpy.j2\n"
+    p = tmp_path / "override.yaml"
+    p.write_text(sp_text)
+    sp = load_species(p)
+    assert dispatch_template(sp) == "my/custom/foo.lpy.j2"
+
+
+def test_write_runs_validator_and_blocks_on_error(tmp_path: Path):
+    """If the validator finds errors, write() should raise and not produce a file."""
+    bad = tmp_path / "bad.lpy.j2"
+    bad.write_text(
+        "module Plant(t)\n"
+        "production:\n"
+        "Plant(t) :\n"
+        "    produce UndeclaredFoo(t)\n"
+    )
+    repo_templates = REPO / "templates"
+    test_dir = repo_templates / "_test"
+    test_dir.mkdir(exist_ok=True)
+    test_template = test_dir / "bad.lpy.j2"
+    test_template.write_text(bad.read_text())
+    try:
+        sp_text = (REPO / _ECHINACEA_ARCH["yaml"]).read_text() + "\ntemplate_override: _test/bad.lpy.j2\n"
+        yaml_path = tmp_path / "bad_species.yaml"
+        yaml_path.write_text(sp_text)
+        sp = load_species(yaml_path)
+        from plant_sim.codegen.validator import ValidationError
+        with pytest.raises(ValidationError) as exc:
+            write(sp, output_dir=tmp_path, seed=99)
+        assert "UndeclaredFoo" in str(exc.value)
+        assert not (tmp_path / f"{_ECHINACEA_ARCH['filename_stem']}_seed_99.lpy").exists()
+    finally:
+        test_template.unlink(missing_ok=True)
+        try:
+            test_dir.rmdir()
+        except OSError:
+            pass
+
+
+# ---- Echinacea-specific assertions ----
+
+@pytest.fixture(scope="module")
 def echinacea_lpy_text() -> str:
-    sp = Species.from_yaml(ECHINACEA_YAML)
+    sp = Species.from_yaml(REPO / _ECHINACEA_ARCH["yaml"])
     return render_archetype(sp, RenderContext(seed=42))
 
 
 @pytest.fixture(scope="module")
 def echinacea_lpy_path(tmp_path_factory, echinacea_lpy_text: str) -> Path:
-    p = tmp_path_factory.mktemp("generated") / "echinacea_purpurea_seed_42.lpy"
+    p = tmp_path_factory.mktemp("gen_echinacea_specific") / "echinacea_purpurea_seed_42.lpy"
     p.write_text(echinacea_lpy_text)
     return p
 
 
-# ---- Rendering ----
-
-def test_template_renders_without_error(echinacea_lpy_text: str):
+def test_echinacea_template_body(echinacea_lpy_text: str):
     assert "Axiom: Plant" in echinacea_lpy_text
     assert "module RosetteLeaf" in echinacea_lpy_text
     assert "module Scape" in echinacea_lpy_text
@@ -67,31 +240,13 @@ def test_template_renders_without_error(echinacea_lpy_text: str):
     assert 'RAY_MAT     = "ray_floret_purple"' in echinacea_lpy_text
 
 
-def test_lengths_converted_to_meters(echinacea_lpy_text: str):
+def test_echinacea_lengths_converted_to_meters(echinacea_lpy_text: str):
     """Echinacea height_range = [24, 48] inches -> [0.6096, 1.2192] meters."""
-    # Grep for the canonical scape-height range in meters, accounting for float repr.
     assert "0.609600" in echinacea_lpy_text   # 24 in
     assert "1.219200" in echinacea_lpy_text   # 48 in
 
 
-def test_externs_declared(echinacea_lpy_text: str):
-    for name in (
-        "T_RENDER", "SPECIMEN_SEED", "TIME_OFFSET_DOY",
-        "EMERGENCE_OFFSET", "POSITION_X_M", "POSITION_Y_M", "POSITION_Z_M",
-    ):
-        assert f"extern({name}" in echinacea_lpy_text, f"missing extern({name}=...)"
-
-
-# ---- L-Py load + derive ----
-
-def test_lpy_loads_and_derives(echinacea_lpy_path: Path):
-    from openalea.lpy import Lsystem
-    lsys = Lsystem(str(echinacea_lpy_path))
-    lstring = lsys.derive()
-    assert len(lstring) > 0
-
-
-def test_persistent_markers_survive_in_lstring(echinacea_lpy_path: Path):
+def test_echinacea_persistent_markers_survive_in_lstring(echinacea_lpy_path: Path):
     """Scape and InfloHead must appear in the final lstring as queryable markers."""
     from openalea.lpy import Lsystem
     lsys = Lsystem(str(echinacea_lpy_path))
@@ -102,7 +257,6 @@ def test_persistent_markers_survive_in_lstring(echinacea_lpy_path: Path):
             counts[module.name] += 1
         except AttributeError:
             pass
-
     # With seed=42 the rosette_count_range [6,14] draws SOME number; we check >=1.
     assert counts["RosetteLeaf"] >= 1, "no RosetteLeaf modules in final lstring"
     # Scape: between 1 and 5 per scape_count_range
@@ -113,146 +267,90 @@ def test_persistent_markers_survive_in_lstring(echinacea_lpy_path: Path):
     )
 
 
-# ---- sceneInterpretation: age-aware geometry ----
-
-def test_scene_at_peak_is_nonempty(echinacea_lpy_path: Path):
+def test_echinacea_scene_grows_over_time(echinacea_lpy_path: Path):
+    """Shape count rises non-trivially as T_RENDER advances through phenology."""
     from openalea.lpy import Lsystem
     lsys = Lsystem(str(echinacea_lpy_path))
     lstring = lsys.derive()
-    lsys.context()["T_RENDER"] = 250.0  # well past peak (DOY 200) and inflorescence
-    scene = lsys.sceneInterpretation(lstring)
-    assert len(scene) > 0, "scene at peak DOY should have shapes"
-
-
-def test_scene_before_leaf_flush_is_empty(echinacea_lpy_path: Path):
-    """T_RENDER < LEAF_FLUSH_DOY (105) -> all sigmoid_grow returns 0 -> scene shapes drop out."""
-    from openalea.lpy import Lsystem
-    lsys = Lsystem(str(echinacea_lpy_path))
-    lstring = lsys.derive()
-    lsys.context()["T_RENDER"] = 50.0  # before any phenology event
-    scene = lsys.sceneInterpretation(lstring)
-    # All renderable modules guard with `if age < 0: produce *`. Before flush,
-    # every module's age is negative, so nothing geometric is emitted.
-    assert len(scene) == 0, f"expected 0 shapes pre-flush, got {len(scene)}"
-
-
-def test_scene_grows_over_time(echinacea_lpy_path: Path):
-    """Scene shape count should rise monotonically (or at least non-trivially) as T_RENDER advances."""
-    from openalea.lpy import Lsystem
-    lsys = Lsystem(str(echinacea_lpy_path))
-    lstring = lsys.derive()
-
     counts = []
     for t in (50.0, 110.0, 180.0, 220.0, 280.0):
         lsys.context()["T_RENDER"] = t
         scene = lsys.sceneInterpretation(lstring)
         counts.append(len(scene))
-
     # Pre-flush 0; mid-season some shapes; mature lots more.
     assert counts[0] == 0
-    assert counts[-1] > counts[1], (
-        f"shape count did not grow over time: {counts}"
-    )
+    assert counts[-1] > counts[1], f"shape count did not grow over time: {counts}"
 
 
-# ---- Generator API surface (Step 4) ----
+# ---- Andropogon-specific assertions ----
 
-def test_load_species_returns_species_object():
-    sp = load_species(ECHINACEA_YAML)
-    assert isinstance(sp, Species)
-    assert sp.scientific_name == "Echinacea purpurea"
-
-
-def test_available_archetypes_lists_rosette_scape_composite():
-    arches = available_archetypes()
-    assert "rosette_scape_composite" in arches
+@pytest.fixture(scope="module")
+def andropogon_lpy_text() -> str:
+    sp = Species.from_yaml(REPO / _ANDROPOGON_ARCH["yaml"])
+    return generate(sp, seed=42)
 
 
-def test_dispatch_template_uses_archetype():
-    sp = load_species(ECHINACEA_YAML)
-    path = dispatch_template(sp)
-    assert path.endswith("rosette_scape_composite.lpy.j2")
+@pytest.fixture(scope="module")
+def andropogon_lpy_path(tmp_path_factory, andropogon_lpy_text: str) -> Path:
+    p = tmp_path_factory.mktemp("gen_andropogon_specific") / "andropogon_gerardii_seed_42.lpy"
+    p.write_text(andropogon_lpy_text)
+    return p
 
 
-def test_dispatch_template_honors_override(tmp_path: Path):
-    sp_text = ECHINACEA_YAML.read_text() + "\ntemplate_override: my/custom/foo.lpy.j2\n"
-    p = tmp_path / "override.yaml"
-    p.write_text(sp_text)
-    sp = load_species(p)
-    assert dispatch_template(sp) == "my/custom/foo.lpy.j2"
+def test_andropogon_template_body(andropogon_lpy_text: str):
+    assert "Axiom: Clump" in andropogon_lpy_text
+    assert "module Tiller(" in andropogon_lpy_text
+    assert "module Panicle(" in andropogon_lpy_text
+    assert "module CulmSegment(" in andropogon_lpy_text  # the wrapper added in Step 8
+    assert 'LEAF_MAT = "leaf_mature_green"' in andropogon_lpy_text
+    assert 'PANICLE_MAT = "panicle_bronze"' in andropogon_lpy_text
 
 
-def test_generate_with_seed_changes_stochastic_draws():
-    sp = load_species(ECHINACEA_YAML)
-    src_a = generate(sp, seed=42)
-    src_b = generate(sp, seed=43)
-    # Same template structure but the SPECIMEN_SEED extern differs.
-    assert "SPECIMEN_SEED = 42" in src_a
-    assert "SPECIMEN_SEED = 43" in src_b
-
-
-def test_write_uses_content_addressed_filename(tmp_path: Path):
-    """Filenames embed the canonical 8-char base32 seed (not raw int)."""
-    from plant_sim.schema.seed import Seed
-    sp = load_species(ECHINACEA_YAML)
-    path = write(sp, output_dir=tmp_path, seed=4711)
-    canonical = Seed(4711).canonical()  # e.g. '00000IM7'
-    assert path.name == f"echinacea_purpurea_seed_{canonical}.lpy"
-    assert path.exists()
-    body = path.read_text()
-    assert f"SPECIMEN_SEED = {4711}" in body  # int form still in extern
-
-
-def test_write_runs_validator_and_blocks_on_error(tmp_path: Path):
-    """If the validator finds errors, write() should raise and not produce a file."""
-    sp = load_species(ECHINACEA_YAML)
-    # Patch the template registry to point at a known-bad template
-    bad = tmp_path / "bad.lpy.j2"
-    bad.write_text(
-        "module Plant(t)\n"
-        "production:\n"
-        "Plant(t) :\n"
-        "    produce UndeclaredFoo(t)\n"
-    )
-    # Use template_override to point at the bad file (relative-to-templates path needed,
-    # so write a separate copy in templates/_test/)
-    repo_templates = REPO / "templates"
-    test_dir = repo_templates / "_test"
-    test_dir.mkdir(exist_ok=True)
-    test_template = test_dir / "bad.lpy.j2"
-    test_template.write_text(bad.read_text())
-    try:
-        sp_text = ECHINACEA_YAML.read_text() + f"\ntemplate_override: _test/bad.lpy.j2\n"
-        yaml_path = tmp_path / "bad_species.yaml"
-        yaml_path.write_text(sp_text)
-        sp = load_species(yaml_path)
-        from plant_sim.codegen.validator import ValidationError
-        with pytest.raises(ValidationError) as exc:
-            write(sp, output_dir=tmp_path, seed=99)
-        assert "UndeclaredFoo" in str(exc.value)
-        # Ensure no file was written
-        assert not (tmp_path / "echinacea_purpurea_seed_99.lpy").exists()
-    finally:
-        # Cleanup the test template so it doesn't pollute future runs
-        test_template.unlink(missing_ok=True)
+def test_andropogon_module_census_matches_spike_2(andropogon_lpy_path: Path):
+    """Census from Spike 2 (Andropogon @ seed=42, mature):
+    20 Tillers, 5 Panicles (one per flowering), ~17 Racemes, ~109 GrassLeaves.
+    """
+    lsys, lstring = derive(andropogon_lpy_path, RenderContext(seed=42))
+    counts: Counter = Counter()
+    for m in lstring:
         try:
-            test_dir.rmdir()
-        except OSError:
+            counts[m.name] += 1
+        except AttributeError:
             pass
+    assert counts["Tiller"] == 20, f"expected 20 Tillers, got {counts['Tiller']}"
+    # Spike 2 with seed=42 produced 5 flowering tillers.
+    assert counts["Panicle"] == 5, f"expected 5 Panicles, got {counts['Panicle']}"
+    # 2-5 racemes per panicle => 10..25 total.
+    assert 10 <= counts["Raceme"] <= 25, f"unexpected Raceme count: {counts['Raceme']}"
+    # 4-7 leaves per tiller => 80..140 total.
+    assert 80 <= counts["GrassLeaf"] <= 140, f"unexpected GrassLeaf count: {counts['GrassLeaf']}"
+    # Crown: one per tiller.
+    assert counts["Crown"] == 20, f"expected 20 Crowns, got {counts['Crown']}"
+
+
+def test_andropogon_sidecar_material_distribution_at_peak(tmp_path: Path, andropogon_lpy_path: Path):
+    """All four Andropogon material_ids should appear in the rendered sidecar."""
+    lsys, lstring = derive(andropogon_lpy_path, RenderContext(seed=42))
+    obj_path = tmp_path / "matdist.obj"
+    _, out_sidecar = export_to_obj_with_sidecar(lsys, lstring, 250.0, obj_path)
+    sidecar = json.loads(out_sidecar.read_text())
+    mats = {e["material_id"] for e in sidecar["shapes"]}
+    expected = {"culm_summer_green", "leaf_mature_green", "crown_dark", "panicle_bronze"}
+    assert expected <= mats, f"missing materials: {expected - mats}"
 
 
 # ---- CLI integration ----
 
-def test_cli_generate_writes_file(tmp_path: Path):
-    from plant_sim.schema.seed import Seed
+@pytest.mark.parametrize("arch_dict", [_ECHINACEA_ARCH, _ANDROPOGON_ARCH], ids=["echinacea", "andropogon"])
+def test_cli_generate_writes_file(arch_dict, tmp_path: Path):
     runner = CliRunner()
     out = tmp_path / "generated"
     result = runner.invoke(
         cli_main,
-        ["generate", str(ECHINACEA_YAML), "--output", str(out), "--seed", "7"],
+        ["generate", str(REPO / arch_dict["yaml"]), "--output", str(out), "--seed", "7"],
     )
     assert result.exit_code == 0, result.output
-    expected = out / f"echinacea_purpurea_seed_{Seed(7).canonical()}.lpy"
+    expected = out / f"{arch_dict['filename_stem']}_seed_{Seed(7).canonical()}.lpy"
     assert expected.exists()
     assert "Wrote" in result.output
 
@@ -263,12 +361,12 @@ def test_cli_generate_accepts_string_seed(tmp_path: Path):
     out = tmp_path / "generated"
     result = runner.invoke(
         cli_main,
-        ["generate", str(ECHINACEA_YAML), "--output", str(out), "--seed", "XQF2-D6S1"],
+        ["generate", str(REPO / _ECHINACEA_ARCH["yaml"]),
+         "--output", str(out), "--seed", "XQF2-D6S1"],
     )
     assert result.exit_code == 0, result.output
     expected = out / "echinacea_purpurea_seed_XQF2D6S1.lpy"
     assert expected.exists()
-    # Round-trip through display form in the CLI output
     assert "XQF2-D6S1" in result.output
 
 
@@ -278,20 +376,17 @@ def test_cli_generate_rejects_invalid_yaml(tmp_path: Path):
     runner = CliRunner()
     result = runner.invoke(cli_main, ["generate", str(bad), "--output", str(tmp_path)])
     assert result.exit_code != 0
-    # Pydantic validation error printed to stderr (mixed in result.output for CliRunner)
     assert "INVALID YAML" in result.output
 
 
-def test_cli_generate_rejects_unknown_material(tmp_path: Path):
-    yaml_text = ECHINACEA_YAML.read_text().replace(
-        "ray_floret_purple", "definitely_not_a_real_material_id"
+@pytest.mark.parametrize("arch_dict", [_ECHINACEA_ARCH, _ANDROPOGON_ARCH], ids=["echinacea", "andropogon"])
+def test_cli_generate_rejects_unknown_material(arch_dict, tmp_path: Path):
+    yaml_text = (REPO / arch_dict["yaml"]).read_text().replace(
+        arch_dict["real_material_id"], "definitely_not_a_real_material_id"
     )
     p = tmp_path / "bad_material.yaml"
     p.write_text(yaml_text)
     runner = CliRunner()
-    result = runner.invoke(
-        cli_main,
-        ["generate", str(p), "--output", str(tmp_path)],
-    )
+    result = runner.invoke(cli_main, ["generate", str(p), "--output", str(tmp_path)])
     assert result.exit_code != 0
     assert "definitely_not_a_real_material_id" in result.output
