@@ -142,9 +142,9 @@ Locked in `templates/archetypes/README.md` as: Y-up, right-handed, origin at geo
 
 ---
 
-## Pending — Scene polygon and key-specimen placement schema (NEW 2026-05-02)
+## Scene polygon and key-specimen placement schema (RESOLVED 2026-05-02)
 
-Driven by F40–F42 in REQUIREMENTS. Communities need a concrete scene-spec format before Phase 3. Several sub-questions:
+Driven by F40–F42 in REQUIREMENTS. Communities need a concrete scene-spec format before Phase 3. Resolutions below; YAML schema sketch at the end.
 
 **Q1: Polygon coordinate format.**
 Three candidates:
@@ -152,7 +152,7 @@ Three candidates:
 - (b) Scene-local meters (the canonical internal unit per A4). Pros: zero projection math; matches everything downstream. Cons: divorced from real-world geography; user has to translate from a basemap manually.
 - (c) Both, with a flag in the YAML. Pros: lets researchers pick. Cons: doubles the schema surface and the test matrix.
 
-**Lean:** (c) but with (a) as the recommended path for the scene composer UI (F42), and (b) as the unadorned researcher path. The scene loader projects (a) into local meters at load time using a flat-earth approximation centered on the polygon centroid (good enough for <10 km scenes).
+**Resolved:** (c) — schema accepts both via an explicit `coord_system` flag. (a) is the recommended path for the scene composer UI (F42); (b) is the unadorned researcher path. The scene loader projects (a) into local meters at load time using a flat-earth approximation centered on the polygon centroid (good enough for <10 km scenes; corresponds to seam S6).
 
 **Q2: Auto-fill placement algorithm.**
 Density spec is per-species (e.g., `Andropogon gerardii: 4 plants/m²`). Candidates:
@@ -160,26 +160,73 @@ Density spec is per-species (e.g., `Andropogon gerardii: 4 plants/m²`). Candida
 - Per-species density × polygon area, placed via grid jitter. Simpler; clumping more visible.
 - Cluster + matrix mix (e.g., Echinacea in clusters, grasses uniform). Realistic but adds parameters.
 
-**Lean:** Poisson disk per species, then composite. Defer cluster behavior to Phase 4+.
+**Resolved:** Poisson disk per species, then composite. Cluster behavior deferred to Phase 4+.
 
 **Q3: Key-specimen interaction with auto-fill.**
 When a user pins a 12 m oak in the middle of a polygon, the auto-fill should probably not place dense grass directly under the trunk. Two implementation strata:
 - (a) Geometric exclusion only — auto-fill skips a circle of radius `r` around each key specimen. Cheap and dumb; user-tunable.
 - (b) Ecological exclusion — density falloff that varies by species pair (e.g., grass density drops under tree canopy, woodland species rise). This is real Phase 4+ light-competition territory and shouldn't gate F41.
 
-**Lean:** ship (a) for V2.2; (b) waits for Phase 4+.
+**Resolved:** Ship (a) for V2.2; (b) waits for Phase 4+.
 
 **Q4: Key-specimen seed semantics.**
 - Default: derive per-specimen seed from `(scene_seed, position_x, position_y, species)` so the same scene seed always produces the same oak in the same spot.
 - Override: allow `key_specimens: [{species, position, seed: "XQF2D6S1"}]` for the BOI-style "I love this exact specimen, pin it across scenes" pattern.
 
-Both should be supported. The default keeps reproducibility automatic; the override gives the seed-curation crowd what they want.
+**Resolved:** Both supported. Default keeps reproducibility automatic; override gives the seed-curation crowd what they want.
 
 **Q5: Coordinate system for key specimens.**
-Must match polygon coordinate system from Q1. If the scene YAML uses geographic polygon, key-specimen positions are lat/lon; if local meters, key specimens are local meters. Mixed mode is forbidden in the schema.
+**Resolved:** Must match polygon coordinate system from Q1. Geographic polygon → key-specimen positions in lat/lon; local meters polygon → positions in meters. Mixed mode is forbidden in the schema.
 
 **Q6: Documentation muddle to fix.**
 F27 in REQUIREMENTS mentions a "scene composition UI" but the description (taxonomy panel, reference photo, morphology checklist) is actually the species-authoring UI, not the scene composer. F27 should be split into F27 (species-authoring UI) and F42 (scene composer UI, now added). Done in this revision.
+
+### Resolved gap fills
+
+Items the rev-2 leans didn't cover, decided 2026-05-02:
+
+- **Polygon shape: GeoJSON `Polygon` or `MultiPolygon`, with rings.** Outer ring + optional interior holes. Use cases: disjoint restoration patches (MultiPolygon); "skip the parking-lot island" (interior ring as hole).
+- **Position quantization for the seed-derive default: 1 cm.** Quantize `(x, y)` to 0.01 m (or rounded equivalent in lat/lon at polygon centroid scale) before salting `Seed.derive`. Defensible because sub-cm jitter is below the positional accuracy of any real placement workflow; without quantization, float noise would change derived seeds.
+- **Default exclusion radius for key specimens: `species.crown_width` upper bound × 0.5.** Pulls the natural crown half-width from the species YAML's existing `crown_width` range. User can override per pin via `exclusion_radius_m`.
+- **Density spec total cap: warn at >20 plants/m² total density per polygon, hard reject at >100.** Conservative numbers; tighten later if needed.
+- **Auto-fill ordering rule.** Key specimens placed first (deterministic from scene seed + species_mix order); auto-fill samples in stable per-species order driven by the species_mix list ordering. Reproducibility property: same scene_seed + same scene YAML → identical placements.
+
+### Scene YAML schema (target shape)
+
+```yaml
+# scenes/prairie_demo.yaml
+name: "prairie_demo"
+description: "0.5 ha prairie restoration test scene"
+
+scene_seed: "PRAR-1234"                # 8-char Crockford base32 (BOI-style); derive from name if omitted
+
+boundary:
+  coord_system: "geographic"           # or "local_meters"
+  geometry:                            # GeoJSON-shaped
+    type: "Polygon"                    # or "MultiPolygon"
+    coordinates: [
+      [[lon, lat], [lon, lat], ...],   # outer ring
+      [[lon, lat], ...]                # optional hole
+    ]
+
+species_mix:
+  - species: "andropogon_gerardii"
+    density_per_m2: 4
+  - species: "echinacea_purpurea"
+    density_per_m2: 2
+
+key_specimens:
+  - species: "quercus_alba"            # only after crown_tree archetype lands (F6)
+    position: [lon, lat]               # must match boundary.coord_system
+    exclusion_radius_m: 6.0            # optional; default species.crown_width upper bound × 0.5
+    seed: "OAKXY123"                   # optional; default derived from (scene_seed, species, quantized position)
+
+auto_fill:
+  algorithm: "poisson_disk"            # only option for now
+  # min_distance_m per species derived from density (~1/sqrt(density))
+```
+
+Code lands at `plant_sim/schema/scene.py` (new) during V2.2 implementation — Pydantic models matching the YAML, plus a `project_to_local_meters(boundary)` helper for the geographic → meters step at scene load.
 
 ---
 
