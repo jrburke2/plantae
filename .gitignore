@@ -1,0 +1,26 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.DS_Store
+
+# Phase 0: regenerated and rendered outputs are gitignored (deterministic)
+generated/*.lpy
+output/*.obj
+output/*.mtl
+output/*.json
+output/*.png
+output/*.gltf
+output/*.glb
+
+# But keep the dirs so fresh checkouts have them
+!generated/.gitkeep
+!output/.gitkeep
+
+# Editor / OS
+.idea/
+.vscode/
+node_modules/

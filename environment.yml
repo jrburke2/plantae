@@ -1,0 +1,46 @@
+# Plant simulator dev environment.
+#
+# On Apple Silicon, create as an osx-64 (Rosetta 2) env because openalea is not
+# yet packaged for arm64:
+#
+#   CONDA_SUBDIR=osx-64 mamba env create -f environment.yml
+#   mamba activate plant_sim
+#   mamba config --env --set subdir osx-64
+#   pip install -e .
+#
+# On Linux x86_64 / Windows / macOS Intel: drop the CONDA_SUBDIR= prefix.
+#
+# This mirrors the spike's lpy_spike env (validated 2026-05-02 across Echinacea
+# and Andropogon spikes). Versions left unpinned for first solve; pin once the
+# env solves on a clean machine.
+
+name: plant_sim
+
+channels:
+  - openalea3
+  - conda-forge
+
+dependencies:
+  - python=3.13
+  - openalea.lpy
+  - openalea.plantgl
+
+  # Pipeline
+  - pydantic>=2.0
+  - jinja2
+  - pyyaml
+  - click
+
+  # Dev server
+  - fastapi
+  - uvicorn
+
+  # CI render path
+  - pillow
+
+  # Test
+  - pytest
+
+  - pip
+  - pip:
+    - -e .

@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "plant_sim"
+version = "0.0.1"
+description = "Algorithmic plant simulator built on L-Py + OpenAlea + three.js"
+requires-python = ">=3.11"
+readme = "README.md"
+dependencies = [
+    "pydantic>=2.0",
+    "jinja2",
+    "pyyaml",
+    "click",
+    "fastapi",
+    "uvicorn",
+    "pillow",
+]
+
+[project.optional-dependencies]
+dev = ["pytest"]
+
+[project.scripts]
+plant-sim = "plant_sim.cli:main"
+
+[tool.setuptools]
+packages = ["plant_sim", "plant_sim.schema", "plant_sim.codegen", "plant_sim.render", "plant_sim.server", "growth_functions"]
