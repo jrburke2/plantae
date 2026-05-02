@@ -8,6 +8,12 @@ units:
   length: in
 height_range: [48, 24]   # inverted
 crown_width: [12, 24]
+material:
+  allowed_forms: [plug]
+  default_form: plug
+grade: [restoration_grade]
+provenance:
+  ecoregion: EPA_L3_54
 habitat:
   primary: [mesic_prairie]
   cc_value: 5

@@ -1,0 +1,13 @@
+# Two-species demonstration mix using the Phase 0 reference species.
+# Not a commercial product; exercises the F57 mix schema end-to-end.
+
+name: restoration_demo_mix
+display_name: "Restoration Demo Mix"
+description: "Demonstration mix exercising the F57 schema with the two Phase 0 reference species."
+grade: restoration_grade
+
+components:
+  - species: andropogon_gerardii
+    weight_pct: 70
+  - species: echinacea_purpurea
+    weight_pct: 30

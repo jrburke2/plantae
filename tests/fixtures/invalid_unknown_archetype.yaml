@@ -8,6 +8,12 @@ units:
   length: in
 height_range: [600, 1000]
 crown_width: [400, 800]
+material:
+  allowed_forms: [B&B, container_3gal, bare_root]
+  default_form: B&B
+grade: [restoration_grade, ornamental_grade]
+provenance:
+  ecoregion: EPA_L3_54
 habitat:
   primary: [oak_savanna]
   cc_value: 5

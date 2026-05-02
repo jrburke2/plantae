@@ -19,6 +19,21 @@ units:
 height_range: [24, 48]
 crown_width: [12, 24]
 
+# F43: plant material forms supported for procurement.
+material:
+  allowed_forms: [seed, plug, container_1gal, container_3gal, bare_root]
+  default_form: plug
+
+# F44: use-case grade. Echinacea is at home in both restoration and ornamental.
+grade: [restoration_grade, ornamental_grade]
+
+# F45: provenance for ecotype-aware procurement.
+provenance:
+  ecoregion: EPA_L3_54           # Central Corn Belt Plains (representative)
+  origin_range:                  # native distribution bounding box (approximate)
+    lat: [35.0, 45.0]
+    lon: [-98.0, -82.0]
+
 habitat:
   primary: [mesic_prairie, dry-mesic_prairie]
   secondary: [savanna, garden]

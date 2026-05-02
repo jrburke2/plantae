@@ -16,6 +16,16 @@ units:
 height_range: [61, 122]
 crown_width: [30, 61]
 
+material:
+  allowed_forms: [seed, plug, container_1gal, container_3gal, bare_root]
+  default_form: plug
+grade: [restoration_grade, ornamental_grade]
+provenance:
+  ecoregion: EPA_L3_54
+  origin_range:
+    lat: [35.0, 45.0]
+    lon: [-98.0, -82.0]
+
 habitat:
   primary: [mesic_prairie]
   cc_value: 5

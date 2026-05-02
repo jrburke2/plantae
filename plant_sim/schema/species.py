@@ -58,6 +58,24 @@ class Phyllotaxis(str, Enum):
 ArchetypeName = Literal["rosette_scape_composite", "tiller_clump"]
 
 
+class MaterialForm(str, Enum):
+    """Plant material form for procurement. Canonical enum; F43."""
+    seed = "seed"
+    plug = "plug"
+    container_1gal = "container_1gal"
+    container_3gal = "container_3gal"
+    bare_root = "bare_root"
+    bnb = "B&B"
+    bulb_corm_rhizome = "bulb_corm_rhizome"
+    cutting = "cutting"
+
+
+class GradeTag(str, Enum):
+    """Use-case grade per species. F44."""
+    restoration_grade = "restoration_grade"
+    ornamental_grade = "ornamental_grade"
+
+
 # === Reusable range types ===
 
 def _range_check(v: tuple, *, allow_equal: bool) -> tuple:
@@ -83,9 +101,76 @@ def _inclusive_range(v: tuple) -> tuple:
     return _range_check(v, allow_equal=True)
 
 
+def _lat_range(v: tuple) -> tuple:
+    lo, hi = _inclusive_range(v)
+    if lo < -90.0 or hi > 90.0:
+        raise ValueError(f"latitude range must be within [-90, 90], got [{lo}, {hi}]")
+    return v
+
+
+def _lon_range(v: tuple) -> tuple:
+    lo, hi = _inclusive_range(v)
+    if lo < -180.0 or hi > 180.0:
+        raise ValueError(f"longitude range must be within [-180, 180], got [{lo}, {hi}]")
+    return v
+
+
 IntRangeStrict = Annotated[tuple[int, int], AfterValidator(_strict_range)]
 IntRangeInclusive = Annotated[tuple[int, int], AfterValidator(_inclusive_range)]
 FloatRangeInclusive = Annotated[tuple[float, float], AfterValidator(_inclusive_range)]
+LatRange = Annotated[tuple[float, float], AfterValidator(_lat_range)]
+LonRange = Annotated[tuple[float, float], AfterValidator(_lon_range)]
+
+
+# === Plant material form metadata (F43) ===
+
+class MaterialMeta(BaseModel):
+    """Plant material form metadata per species (F43)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    allowed_forms: list[MaterialForm] = Field(
+        min_length=1,
+        description="Material forms this species supports (e.g. seed, plug, container_1gal). At least one.",
+    )
+    default_form: MaterialForm = Field(
+        description="Default form for BOM rows. Must be one of allowed_forms.",
+    )
+
+    @model_validator(mode="after")
+    def default_in_allowed(self) -> MaterialMeta:
+        if self.default_form not in self.allowed_forms:
+            raise ValueError(
+                f"default_form {self.default_form.value!r} must be one of allowed_forms "
+                f"({[f.value for f in self.allowed_forms]})"
+            )
+        return self
+
+
+# === Provenance (F45) ===
+
+class OriginRange(BaseModel):
+    """Lat/lon bounding box for a species' native origin."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    lat: LatRange = Field(description="Latitude range [min, max] in WGS84 degrees, -90..90.")
+    lon: LonRange = Field(description="Longitude range [min, max] in WGS84 degrees, -180..180.")
+
+
+class Provenance(BaseModel):
+    """Provenance attribute for ecotype-aware procurement (F45)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    ecoregion: str = Field(
+        min_length=1,
+        description="Ecoregion code: Bailey or EPA Level III/IV (e.g. 'EPA_L3_54').",
+    )
+    origin_range: OriginRange | None = Field(
+        default=None,
+        description="Optional lat/lon bounding box of the species' native origin range.",
+    )
 
 
 # === Common header components ===
@@ -423,6 +508,17 @@ class Species(BaseModel):
     phenology: Phenology
     parameters: ArchetypeParameters = Field(
         description="Archetype-specific parameter block. Schema dispatched on `archetype`.",
+    )
+
+    material: MaterialMeta = Field(
+        description="Plant material form metadata (allowed forms + default form). F43.",
+    )
+    grade: list[GradeTag] = Field(
+        min_length=1,
+        description="Use-case grade(s): restoration_grade, ornamental_grade, or both. F44.",
+    )
+    provenance: Provenance = Field(
+        description="Provenance: ecoregion code plus optional origin lat/lon range. F45.",
     )
 
     template_override: str | None = Field(

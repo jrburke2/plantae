@@ -13,6 +13,11 @@ import pytest
 from pydantic import ValidationError
 
 from plant_sim.schema.species import (
+    GradeTag,
+    MaterialForm,
+    MaterialMeta,
+    OriginRange,
+    Provenance,
     RosetteScapeCompositeParameters,
     Species,
     TillerClumpParameters,
@@ -91,6 +96,65 @@ def test_json_schema_export_contains_descriptions_and_archetypes():
     # Field descriptions should propagate (used by VS Code yaml-language-server)
     assert "Coefficient of Conservatism" in rendered
     assert "scape" in rendered.lower()
+
+
+# ---- F43 / F44 / F45: material form, grade, provenance ----
+
+def test_echinacea_material_grade_provenance_loaded():
+    sp = Species.from_yaml(SPECIES / "asteraceae" / "echinacea_purpurea.yaml")
+    assert MaterialForm.plug in sp.material.allowed_forms
+    assert sp.material.default_form == MaterialForm.plug
+    assert GradeTag.restoration_grade in sp.grade
+    assert GradeTag.ornamental_grade in sp.grade
+    assert sp.provenance.ecoregion == "EPA_L3_54"
+    assert sp.provenance.origin_range is not None
+    assert sp.provenance.origin_range.lat == (35.0, 45.0)
+
+
+def test_andropogon_material_grade_provenance_loaded():
+    sp = Species.from_yaml(SPECIES / "poaceae" / "andropogon_gerardii.yaml")
+    assert sp.material.default_form == MaterialForm.seed
+    assert sp.grade == [GradeTag.restoration_grade]
+    assert sp.provenance.ecoregion == "EPA_L3_54"
+    assert sp.provenance.origin_range is None        # demonstrates the optional case
+
+
+def test_default_form_must_be_in_allowed_forms():
+    with pytest.raises(ValidationError, match="default_form"):
+        MaterialMeta(allowed_forms=[MaterialForm.seed], default_form=MaterialForm.plug)
+
+
+def test_allowed_forms_must_be_non_empty():
+    with pytest.raises(ValidationError):
+        MaterialMeta(allowed_forms=[], default_form=MaterialForm.seed)
+
+
+def test_grade_must_be_non_empty():
+    with pytest.raises(ValidationError):
+        # Build a valid Species kwargs by reading the canonical YAML and
+        # zeroing out grade — easiest path through the existing field stack.
+        import yaml as _yaml
+        data = _yaml.safe_load((SPECIES / "asteraceae" / "echinacea_purpurea.yaml").read_text())
+        data["grade"] = []
+        Species.model_validate(data)
+
+
+def test_provenance_origin_range_optional():
+    p = Provenance(ecoregion="EPA_L3_54")
+    assert p.origin_range is None
+
+
+@pytest.mark.parametrize("kwargs", [
+    {"lat": (-100.0, 0.0), "lon": (0.0, 10.0)},      # lat below -90
+    {"lat": (0.0, 100.0), "lon": (0.0, 10.0)},       # lat above 90
+    {"lat": (0.0, 10.0), "lon": (-200.0, 0.0)},      # lon below -180
+    {"lat": (0.0, 10.0), "lon": (0.0, 200.0)},       # lon above 180
+    {"lat": (10.0, 0.0), "lon": (0.0, 10.0)},        # lat min > max
+    {"lat": (0.0, 10.0), "lon": (10.0, 0.0)},        # lon min > max
+])
+def test_origin_range_lat_lon_validation(kwargs):
+    with pytest.raises(ValidationError):
+        OriginRange(**kwargs)
 
 
 # ---- Escape-hatch field exists and accepts an override path ----

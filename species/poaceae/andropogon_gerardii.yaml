@@ -15,6 +15,19 @@ units:
 height_range: [60, 84]
 crown_width: [12, 36]
 
+# F43: classic restoration grass; primarily seed.
+material:
+  allowed_forms: [seed, plug, bare_root]
+  default_form: seed
+
+# F44: restoration use only (not typically used as an ornamental).
+grade: [restoration_grade]
+
+# F45: provenance. A. gerardii's native range is broad; ecoregion is representative.
+provenance:
+  ecoregion: EPA_L3_54
+  # origin_range omitted — demonstrates the optional case.
+
 habitat:
   primary: [mesic_prairie, dry-mesic_prairie]
   secondary: [wet-mesic_prairie, savanna]
