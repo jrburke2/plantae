@@ -84,11 +84,11 @@ Templates compute effective phenology as `<event>_doy + EMERGENCE_OFFSET` before
 
 ---
 
-## Pending — Material id validation against library
+## Material id validation against library (RESOLVED)
 
 **Q:** Schema currently treats `material_id` as an arbitrary string. Should the validator cross-check that the id exists in `materials/library.json`?
 
-**Likely answer:** Yes. Phase 0 stub library now exists at `materials/library.json` with the ids needed for Echinacea + Andropogon. Cross-check belongs in Step 4 codegen validator.
+**Resolved:** Yes — implemented in `plant_sim/codegen/validator.py` (`MaterialCrossCheck` + `collect_material_ids`). Runs from `write()` and via the `plant-sim generate` CLI. Covered by `test_validator.py::test_material_cross_check_*` and `test_codegen.py::test_cli_generate_rejects_unknown_material`.
 
 ---
 
@@ -124,21 +124,23 @@ Templates compute effective phenology as `<event>_doy + EMERGENCE_OFFSET` before
 
 ---
 
-## Pending — Per-specimen material variation
+## Per-specimen material variation (DEFERRED to Phase 4+)
 
-**Q:** Sun-leaves vs shade-leaves, microhabitat color shifts. Currently `material_id` is baked at codegen time per species, not per specimen. Phase 4+ ecology problem; logged so it's not a surprise.
+**Q:** Sun-leaves vs shade-leaves, microhabitat color shifts. Currently `material_id` is baked at codegen time per species, not per specimen.
 
----
-
-## Pending — Coordinate convention adoption
-
-Locked in `templates/archetypes/README.md` as: Y-up, right-handed, origin at geometric base, internal unit meters. All archetype templates and the viewer must follow.
+**Deferred:** Phase 4+ ecology problem. Will require a per-instance material override mechanism plus the underlying ecology/light-competition model. Not on the near-term roadmap; logged so it's not a surprise when the community renderer makes its absence visible.
 
 ---
 
-## Pending — Lstring caching
+## Coordinate convention adoption (RESOLVED)
 
-`derive()` is 1-10 ms; multi-specimen scenes will call it 100s of times. Server-side memoization keyed on `(species_yaml_hash, seed)` is required for Phase 3 and trivial to add in Step 7. Not building yet.
+Locked in `templates/archetypes/README.md` and codified as A4 in REQUIREMENTS: Y-up, right-handed, origin at geometric base, internal unit meters. All archetype templates and the viewer follow this convention.
+
+---
+
+## Lstring caching (DEFERRED to Phase 3)
+
+`derive()` is 1-10 ms; multi-specimen scenes will call it 100s of times. Server-side memoization keyed on `(species_yaml_hash, seed)` is required for Phase 3 community rendering. Build alongside the first multi-specimen render so the cache shape is informed by real access patterns (audit item (c) below, early reads, agrees). Implementation is small once the use case lands.
 
 ---
 
