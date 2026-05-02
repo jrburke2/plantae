@@ -39,7 +39,7 @@ phenology:
 
 parameters:
   rosette:
-    leaf_count_range: [6, 14]
+    leaf_count_range: [6, 16]
     leaf_template: lanceolate_serrate
     leaf_length_range: [4, 8]
     petiole_length_range: [1, 3]
