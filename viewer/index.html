@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>plant_sim viewer</title>
+<style>
+  body { margin: 0; font-family: system-ui, sans-serif; background: #1a1a1a; color: #eee; overflow: hidden; }
+  #info {
+    position: absolute; top: 0; left: 0; right: 0; padding: 1rem;
+    background: rgba(0,0,0,0.7); pointer-events: none; z-index: 10;
+  }
+  #info h1 { margin: 0 0 0.25rem 0; font-size: 1.1rem; font-weight: 500; }
+  #info p { margin: 0; font-size: 0.85rem; opacity: 0.7; }
+  #controls {
+    position: absolute; bottom: 0; left: 0; right: 0; padding: 1rem;
+    background: rgba(0,0,0,0.7); z-index: 10;
+  }
+  #slider { width: 100%; }
+  .row { display: flex; align-items: center; gap: 0.75rem; margin-top: 0.4rem; }
+  #t-display { font-family: ui-monospace, monospace; font-size: 0.9rem; min-width: 11rem; }
+  #status { font-size: 0.8rem; opacity: 0.7; }
+  canvas { display: block; }
+</style>
+</head>
+<body>
+
+<div id="info">
+  <h1 id="title">plant_sim viewer</h1>
+  <p>Drag to rotate. Scroll to zoom. Slider scrubs through the season.</p>
+</div>
+
+<div id="controls">
+  <input type="range" id="slider" min="1" max="366" step="1" value="200">
+  <div class="row">
+    <span id="t-display">T_RENDER = 200 (DOY)</span>
+    <span id="status"></span>
+  </div>
+</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+<script type="module" src="./main.js"></script>
+
+</body>
+</html>

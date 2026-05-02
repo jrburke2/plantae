@@ -1,0 +1,143 @@
+"""Server tests for Step 7.
+
+Uses FastAPI's TestClient (no actual port bind). Exercises:
+- /health returns ok
+- /render/scene.obj returns OBJ text with `o SHAPE_<id>` group lines
+- /render/scene.materials.json returns valid sidecar JSON
+- A second request for the same (species, seed, t) hits the disk cache
+- Invalid species_id, seed, or t are rejected with 4xx
+- Static mounts: /materials/library.json and /viewer/index.html serve
+- Root redirects to the viewer
+"""
+
+from __future__ import annotations
+
+import json
+
+import pytest
+from fastapi.testclient import TestClient
+
+from plant_sim.server.app import app, reset_cache
+
+
+@pytest.fixture
+def client():
+    reset_cache()
+    return TestClient(app)
+
+
+# ---- Health + root ----
+
+def test_health_endpoint(client):
+    resp = client.get("/health")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["status"] == "ok"
+
+
+def test_root_redirects_to_viewer(client):
+    resp = client.get("/", follow_redirects=False)
+    assert resp.status_code in (302, 307)
+    assert "/viewer/" in resp.headers["location"]
+
+
+# ---- /render/scene.obj ----
+
+def test_render_obj_returns_obj_text(client):
+    resp = client.get("/render/scene.obj?species=echinacea_purpurea&seed=42&t=250")
+    assert resp.status_code == 200
+    body = resp.text
+    # OBJ must have at least one stable shape group line
+    assert "o SHAPE_" in body
+    # Should NOT contain the per-process address-suffixed names
+    assert "SHAPEID_" not in body
+
+
+def test_render_obj_pre_flush_is_empty(client):
+    resp = client.get("/render/scene.obj?species=echinacea_purpurea&seed=42&t=50")
+    assert resp.status_code == 200
+    body = resp.text
+    assert "o SHAPE_" not in body  # No shapes pre-flush
+
+
+# ---- /render/scene.materials.json ----
+
+def test_render_sidecar_returns_json(client):
+    resp = client.get("/render/scene.materials.json?species=echinacea_purpurea&seed=42&t=250")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert "shapes" in body
+    assert "meta" in body
+    assert body["meta"]["t_render"] == 250.0
+    assert body["meta"]["species"] == "echinacea_purpurea"
+    assert body["meta"]["seed"] == 42
+    assert all("name" in e and "material_id" in e for e in body["shapes"])
+
+
+def test_render_sidecar_count_matches_obj_groups(client):
+    obj_resp = client.get("/render/scene.obj?species=echinacea_purpurea&seed=42&t=250")
+    json_resp = client.get("/render/scene.materials.json?species=echinacea_purpurea&seed=42&t=250")
+    obj_groups = [l for l in obj_resp.text.splitlines() if l.startswith("o ")]
+    sidecar = json_resp.json()
+    assert len(obj_groups) == len(sidecar["shapes"])
+
+
+# ---- Caching: lstring is reused across different t values ----
+
+def test_lstring_cache_persists_across_t(client):
+    # Two requests with same (species, seed) but different t: derive only happens once
+    client.get("/render/scene.obj?species=echinacea_purpurea&seed=42&t=180")
+    client.get("/render/scene.obj?species=echinacea_purpurea&seed=42&t=220")
+    health = client.get("/health").json()
+    # cache_size counts (species, seed) keys; should be 1 even though we hit two t values
+    assert health["cache_size"] == 1
+
+
+# ---- Validation ----
+
+def test_unknown_species_404(client):
+    resp = client.get("/render/scene.obj?species=nonexistent_species&seed=42&t=200")
+    assert resp.status_code == 404
+
+
+def test_invalid_t_rejected(client):
+    resp = client.get("/render/scene.obj?species=echinacea_purpurea&seed=42&t=999")
+    assert resp.status_code == 400
+
+
+def test_negative_seed_rejected(client):
+    resp = client.get("/render/scene.obj?species=echinacea_purpurea&seed=-1&t=200")
+    assert resp.status_code == 400
+
+
+def test_invalid_species_id_chars_rejected(client):
+    resp = client.get("/render/scene.obj?species=../../etc/passwd&seed=42&t=200")
+    assert resp.status_code == 400
+
+
+# ---- Static mounts ----
+
+def test_materials_library_served(client):
+    resp = client.get("/materials/library.json")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert "leaf_mature_green" in body
+
+
+def test_viewer_index_html_served(client):
+    resp = client.get("/viewer/index.html")
+    assert resp.status_code == 200
+    assert "plant_sim viewer" in resp.text.lower()
+
+
+def test_viewer_main_js_served(client):
+    resp = client.get("/viewer/main.js")
+    assert resp.status_code == 200
+    assert "OrbitControls" in resp.text
+    assert "applyMaterialsToObject" in resp.text
+
+
+def test_viewer_material_loader_served(client):
+    resp = client.get("/viewer/material_loader.js")
+    assert resp.status_code == 200
+    assert "evaluateColorCurve" in resp.text
