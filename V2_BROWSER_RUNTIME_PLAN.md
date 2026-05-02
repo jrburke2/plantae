@@ -335,12 +335,14 @@ V2 is complete when, on a fresh checkout / web visit:
 
 ## 8. Open questions
 
-1. **TS bundler choice.** ESM modules with no build step (current viewer
-   pattern) vs Vite/esbuild for tree-shaking and minification. OPEN_QUESTIONS
-   audit item (e) revisits this through the principle lens (P3, minimum tool
-   surface): the current lean toward esbuild may not survive that scrutiny.
-   Likely path: no-build ESM through V2.0 and V2.1, adopt esbuild only when
-   bundle pain is concrete.
+1. **TS bundler choice (resolved 2026-05-02).** No-build raw ESM through
+   V2.0 and V2.1 — the viewer already runs no-build with native browser
+   imports. Adopt esbuild only when bundle pain is concrete (transfer
+   approaching the 2 MB compressed budget per §7.6, or HTTP/2 multiplexing
+   not absorbing the request count on real connections). Vite considered
+   only if esbuild's seams don't fit. P3 — deps earn their way; the
+   bundler doesn't earn its way prophylactically. See OPEN_QUESTIONS
+   audit item (e).
 2. **Web Worker isolation.** Should `generate()` run in a Web Worker so
    the main thread stays responsive during slider scrubs? Probably yes for
    community renders >50 specimens, no for single-specimen.

@@ -396,15 +396,15 @@ Code lands at `plant_sim/schema/species.py` (existing — additive Pydantic fiel
 
 ---
 
-## Pending — Audit against engineering principles (NEW 2026-05-02, early reads)
+## Audit against engineering principles (RESOLVED 2026-05-02)
 
-Five items surfaced from a pass through REQUIREMENTS and OPEN_QUESTIONS against `engineering_principles.md`. All are **early reads, not decisions** — they're proposals to be argued, refined, or rejected. Logged here so they don't fall through the cracks.
+Five items surfaced from a pass through REQUIREMENTS and OPEN_QUESTIONS against `engineering_principles.md`, originally logged as early reads. All five resolved 2026-05-02 with the positions below. Future audit passes can append additional items as the codebase evolves.
 
-### a. Scene composer UI (F42) phasing
+### a. Scene composer UI (F42) phasing (RESOLVED 2026-05-02)
 
 Currently parked at Phase 5+. P1 (deep usability at every facet) suggests earlier. Communities ship at Phase 3 and would stay hand-authored YAML-only until Phase 5+, which is years of community-rendering capability without the polygon UI that makes it usable for non-technical users (designers, contractors, restoration coordinators). Counter: hand-authored YAML works; researchers and developers can produce scenes without the UI; UI is a contributor-experience improvement, not a blocker for core capability.
 
-**Early read:** move F42 to Phase 3 alongside community rendering, since that's when scenes become a user-facing concept rather than a developer-facing one. Phase 5+ is the right slot only if early users will all be technical, which contradicts the design-to-procurement vision.
+**Resolved:** Move F42 to Phase 3 alongside community rendering. Scenes become a user-facing concept the moment communities render; non-technical users (contractors, restoration coordinators) are the marketplace concept's stated audience and shouldn't have to hand-write YAML to use a feature that exists. Phase 5+ was the right slot only if early users were all technical — which contradicts the design-to-procurement vision. F42 entry in REQUIREMENTS updated accordingly.
 
 ### b. Scene artifact (F46) vs scene YAML (F36) duplication (RESOLVED 2026-05-02)
 
@@ -412,20 +412,20 @@ F46 originally described a portable scene artifact distinct from `scenes/<scene_
 
 **Resolved:** The scene YAML is the scene artifact at a single shared schema. F46 collapses to "scene YAML passthrough with version frontmatter" — the export CLI emits a copy of the scene YAML alongside the BOM, no new format. If developer-facing fields appear later, scope them with a `_dev` namespace inside the YAML rather than forking the format. Resolution co-decided with plant-output schema Q4 (see Resolved section above).
 
-### c. Lstring caching priority
+### c. Lstring caching priority (RESOLVED 2026-05-02)
 
 Currently logged as Phase 3 prerequisite, "trivial to add in Step 7. Not building yet." S11 (specimen ↔ community seam) makes lstring caching load-bearing for community work, and ~100 to ~2000 derives at 1-10ms each (NF3 target) is exactly the runtime cost P4 puts downward pressure on. Counter: premature work before the community use case lands; the cache shape might need to differ once we see real access patterns.
 
-**Early read:** no change to actual sequencing, but elevate the status from "deferred" to "build alongside the first multi-specimen render in Phase 3" so it doesn't get forgotten as a forcing function for the community render to feel right. The trivial implementation noted (memoization keyed on `(species_yaml_hash, seed)`) is probably the right starting shape.
+**Resolved:** Aligns with the deferral committed for the standalone "Lstring caching" item above — build alongside the first multi-specimen render in Phase 3, with `(species_yaml_hash, seed)` memoization as the starting shape. The audit served its purpose by elevating the trigger from "Phase 3 sometime" to "first multi-specimen render so the cache shape is informed by real access patterns."
 
-### d. glTF revisit for V2 / landscape scale
+### d. glTF revisit for V2 / landscape scale (RESOLVED 2026-05-02)
 
 A2 chose OBJ + JSON sidecar because PlantGL had no glTF codec. The constraint is irrelevant in V2 (no PlantGL). Currently OBJ + JSON wins on P3 (no extra dep, parsers are commodities) and P6 (two open formats). At landscape scale (Phase 4+, NF4 1000+ plants), native glTF instancing (KHR_mesh_instancing) may win on P4 against three.js InstancedMesh-of-OBJ-geometry, since the format itself can encode instances natively rather than the renderer reconstructing them. Counter: not yet, community-scale renders haven't proven the perf problem; switching exporters mid-stream is real cost.
 
-**Early read:** stay OBJ + JSON through V2.3. Re-evaluate at Phase 4+ when landscape rendering starts struggling. The decision tree is cleaner now (PlantGL constraint gone), so a future re-evaluation will be quick if perf data forces it.
+**Resolved:** Stay OBJ + JSON through V2.3. **Trigger to re-evaluate:** Phase 4+ landscape-rendering perf data — specifically, frame time on 1000+-plant scenes if three.js InstancedMesh-of-OBJ doesn't hit NF4. Decision tree is cleaner now (PlantGL constraint gone), so a future re-evaluation is quick if perf forces it.
 
-### e. V2 bundler choice through the principle lens
+### e. V2 bundler choice through the principle lens (RESOLVED 2026-05-02)
 
-OPEN_QUESTIONS leans esbuild over Vite over no-build ESM. P3 (minimum dependency and tool surface) suggests revisiting. No-build raw ESM is zero build tooling; the plantae viewer already runs no-build with native browser imports. esbuild earns its way only when bundle composition or size becomes a real constraint. Counter: V2.2+ communities and species catalog growth may want code splitting and compression that ESM-direct can't offer; the V2 done criterion of <2 MB compressed (V2 §7.6) probably needs a bundler at scale.
+OPEN_QUESTIONS originally leaned esbuild over Vite over no-build ESM. P3 (minimum dependency and tool surface) suggests revisiting. No-build raw ESM is zero build tooling; the plantae viewer already runs no-build with native browser imports. esbuild earns its way only when bundle composition or size becomes a real constraint. Counter: V2.2+ communities and species catalog growth may want code splitting and compression that ESM-direct can't offer; the V2 done criterion of <2 MB compressed (V2 §7.6) probably needs a bundler at scale.
 
-**Early read:** no-build raw ESM through V2.0 and V2.1, prove cross-runtime parity and the algorithm port without bundler complexity. Adopt esbuild only when bundle pain is concrete (sizes approaching 2 MB, or HTTP/2 multiplexing not absorbing the request count). P3 says deps earn their way; bundler doesn't earn its way prophylactically.
+**Resolved:** No-build raw ESM through V2.0 and V2.1. **Trigger to adopt a bundler:** bundle pain becomes concrete — total transfer approaching the 2 MB compressed budget, or HTTP/2 multiplexing not absorbing the request count on real connections. esbuild is the first stop when triggered; Vite only if esbuild's seams don't fit. P3 says deps earn their way; the bundler doesn't earn its way prophylactically. V2 plan §8.1 updated to reflect.

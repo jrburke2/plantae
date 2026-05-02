@@ -80,7 +80,7 @@ Built on the OpenAlea ecosystem (L-Py + PlantGL) for Phase 0; planned migration 
 - **F39** 📋 Phase 3 target: ~500–2000 plants smooth in browser (with instancing + frame caching).
 - **F40** 📋 Scene boundary defined as a GeoJSON-shaped `Polygon` or `MultiPolygon` (outer ring plus optional interior holes). Coordinate system is selectable per scene via a `coord_system` flag: `geographic` (lat/lon, recommended for the F42 scene composer UI) or `local_meters` (researcher path). The scene loader projects geographic input to local meters at load time using a flat-earth approximation centered on the polygon centroid (resolved seam S6; <10 km scenes). Auto-fill samples specimens to populate the polygon interior via Poisson disk per species, governed by the species mix and density spec.
 - **F41** 📋 Key-specimen manual placement: user pins specific specimens at chosen positions within the scene boundary; positions must use the same `coord_system` as F40. Canonical case: large trees as canopy anchors placed before the matrix is auto-filled (depends on the `crown_tree` archetype landing in Phase 1, F6). Any species is eligible. Auto-fill skips a configurable exclusion circle around each pin (default radius = `species.crown_width` upper bound × 0.5; user-overridable via `exclusion_radius_m`). Per-specimen seed is either derived from `(scene_seed, species, quantized-position-1cm)` by default or overridden inline (BOI-style "pin this exact specimen").
-- **F42** 📋 Scene composer UI: draw or import polygon, place key specimens on a basemap, configure species mix and densities, save to `scenes/<scene_name>.yaml`. Phase 5+ in current planning; the underlying scene-spec schema is needed earlier (Phase 3) so hand-authored YAML scenes work without the UI.
+- **F42** 📋 Scene composer UI: draw or import polygon, place key specimens on a basemap, configure species mix and densities, save to `scenes/<scene_name>.yaml`. Phase 3 (alongside community rendering, audit item (a) resolved 2026-05-02). The underlying scene-spec schema lands earlier (already implemented at `plant_sim/schema/scene.py`) so hand-authored YAML scenes work without the UI.
 
 ### Plant output & export
 
@@ -268,7 +268,7 @@ From V2_BROWSER_RUNTIME_PLAN §7:
 
 Tracked in detail in `OPEN_QUESTIONS.md`. Summary:
 
-- ❓ **TS bundler choice for V2** — esbuild vs Vite vs no-build ESM (currently lean esbuild).
+- ✅ **TS bundler choice for V2** — no-build raw ESM through V2.0/V2.1; adopt esbuild only when bundle pain is concrete (audit item (e), resolved 2026-05-02).
 - ❓ **Web Worker isolation** — should `generate()` run in a Web Worker for community renders >50? Probably yes.
 - ❓ **Template version pinning per scene** — should saved scenes pin the template version that created them?
 - ❓ **Mobile performance** — needs measurement before V2.3 ships.
