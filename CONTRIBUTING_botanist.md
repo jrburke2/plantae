@@ -79,6 +79,18 @@ units:
 height_range: [24, 48]                    # min, max plant height
 crown_width: [12, 24]                     # min, max crown width
 
+material:                                 # F43: forms this species is sold in
+  allowed_forms: [seed, plug, container_1gal, container_3gal, bare_root]
+  default_form: plug                      # must be in allowed_forms
+
+grade: [restoration_grade, ornamental_grade]   # F44: one or both
+
+provenance:                               # F45: ecotype-aware procurement
+  ecoregion: EPA_L3_54                    # Bailey or EPA Level III/IV code
+  origin_range:                           # optional native lat/lon box
+    lat: [35.0, 45.0]
+    lon: [-98.0, -82.0]
+
 habitat:
   primary: [mesic_prairie, dry-mesic_prairie]
   secondary: [savanna, garden]
@@ -138,6 +150,11 @@ The schema enforces:
   color the library doesn't have, either pick the closest existing one
   or follow [CONTRIBUTING_developer.md](CONTRIBUTING_developer.md) to
   add a new entry.
+- `material.default_form` must be one of `material.allowed_forms`.
+- `grade` must be a non-empty list of `restoration_grade` and/or
+  `ornamental_grade`.
+- `provenance.origin_range.lat` in `[-90, 90]`,
+  `provenance.origin_range.lon` in `[-180, 180]` (decimal degrees, WGS84).
 
 ### 4. Open a PR
 
@@ -170,6 +187,110 @@ PR comment so you don't need to pull locally.
 If your specimen looks wrong (counts way off, missing structure,
 material miscolored), iterate on the YAML and push again. The bot
 re-comments per push.
+
+---
+
+## Plant material, grade, provenance
+
+Three fields drive the procurement-side handoff (the BOM that downstream
+buyers consume). They don't affect rendering — they describe how the
+plant is actually sold and where it should come from.
+
+### `material` — what forms it's sold in
+
+```yaml
+material:
+  allowed_forms: [seed, plug, container_1gal, container_3gal, bare_root]
+  default_form: plug
+```
+
+`allowed_forms` is the subset of canonical forms this species reasonably
+tolerates. The canonical eight: `seed`, `plug`, `container_1gal`,
+`container_3gal`, `bare_root`, `B&B` (balled-and-burlapped, mostly
+trees), `bulb_corm_rhizome`, `cutting`. List only the ones a real grower
+or seed supplier offers — taproot species like *Asclepias tuberosa*
+don't bare-root well; some sedges only establish reliably from plugs.
+
+`default_form` is what the BOM uses unless a scene overrides it. One
+default per species, regardless of grade. Pick the form most users will
+want by default.
+
+### `grade` — restoration vs ornamental use
+
+```yaml
+grade: [restoration_grade, ornamental_grade]   # both
+# or
+grade: [restoration_grade]                     # restoration-only
+# or
+grade: [ornamental_grade]                      # ornamental-only
+```
+
+Drives downstream sorting in procurement. Restoration buyers want PLS
+seed by the pound and strict ecotype matching; ornamental buyers want
+specimen-quality plants and care less about provenance. A species can
+serve both audiences; mark both. *Andropogon gerardii* is restoration
+only (it's a wild grass); *Echinacea purpurea* serves both.
+
+### `provenance` — ecoregion + origin range
+
+```yaml
+provenance:
+  ecoregion: EPA_L3_54           # required: Bailey or EPA L3/L4 code
+  origin_range:                  # optional native lat/lon box
+    lat: [35.0, 45.0]
+    lon: [-98.0, -82.0]
+```
+
+`ecoregion` is required: a code naming the species' representative
+ecoregion. EPA Level III/IV (`EPA_L3_<n>`, `EPA_L4_<n>`) or Bailey
+codes both work — pick the framework your audience uses.
+
+`origin_range` is optional: a lat/lon bounding box describing where the
+species is actually native. Procurement consumers use it to filter for
+ecotype-appropriate seed sources. Omit it if you don't have authoritative
+data; partial information is worse than no information.
+
+---
+
+## Defining a seed mix
+
+Mixes (F57) are reusable named bundles of multiple species at specific
+weight percentages — the standard restoration procurement unit. Drop a
+mix YAML at `mixes/<mix_name>.yaml`:
+
+```yaml
+name: tallgrass_prairie_mix          # must match the filename stem
+display_name: "Tallgrass Prairie Mix"
+description: "Standard Midwest tallgrass restoration mix"
+grade: restoration_grade
+
+components:                          # weight_pct values must sum to 100
+  - species: andropogon_gerardii
+    weight_pct: 30
+  - species: schizachyrium_scoparium
+    weight_pct: 25
+  - species: sorghastrum_nutans
+    weight_pct: 20
+  - species: elymus_canadensis
+    weight_pct: 15
+  - species: rudbeckia_hirta
+    weight_pct: 5
+  - species: echinacea_pallida
+    weight_pct: 5
+```
+
+Schema enforces: at least 2 components, no duplicate species, weights
+sum to 100, file `name` matches filename stem.
+
+A scene can reference a mix by name in its species_mix list:
+
+```yaml
+species_mix:
+  - mix: tallgrass_prairie_mix
+    application_rate:
+      value: 8
+      unit: lb_PLS_per_acre
+```
 
 ---
 
