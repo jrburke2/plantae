@@ -5,10 +5,8 @@ a `units` block at the top of the YAML; the codegen converts those values
 to the canonical internal unit (meters) when emitting the generated .lpy.
 
 Built-in length units are provided. Contributors who need a unit not
-covered here can either:
-  (a) define a custom length unit inline in the species YAML
-      (`units.length: {name: my_unit, meters_per_unit: 0.42}`), or
-  (b) call `register_length_unit(...)` programmatically before validating.
+covered here define a custom length unit inline in the species YAML
+(`units.length: {name: my_unit, meters_per_unit: 0.42}`).
 
 Angles are always degrees in this project (design doc commitment).
 Calendar dates are always day-of-year (DOY, 1-366). Neither is configurable.
@@ -38,18 +36,6 @@ _BUILTIN_LENGTH_UNITS: dict[str, float] = {
     "ft": 0.3048,
     "yd": 0.9144,
 }
-
-
-def register_length_unit(name: str, meters_per_unit: float) -> None:
-    """Programmatic extension point for unit systems not covered above.
-
-    Call this before loading a species YAML that references the new unit.
-    """
-    if meters_per_unit <= 0:
-        raise ValueError(f"meters_per_unit must be > 0, got {meters_per_unit}")
-    if name in _BUILTIN_LENGTH_UNITS:
-        raise ValueError(f"length unit {name!r} is already registered")
-    _BUILTIN_LENGTH_UNITS[name] = meters_per_unit
 
 
 def known_length_units() -> list[str]:
@@ -112,8 +98,7 @@ class UnitSystem(BaseModel):
             raise ValueError(
                 f"Unknown length unit {self.length!r}. "
                 f"Known units: {known_length_units()}. "
-                f"Either use a registered name, define an inline custom unit, "
-                f"or call register_length_unit() before loading."
+                f"Use a registered name or define an inline custom unit."
             )
         return value * _BUILTIN_LENGTH_UNITS[self.length]
 

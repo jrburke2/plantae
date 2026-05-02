@@ -5,7 +5,6 @@ Verify that:
 - A species declared in metric loads with values in its native unit but
   the unit-conversion helper returns meters consistently.
 - Inline custom-unit definitions work.
-- Programmatic register_length_unit() works for unknown systems.
 - Unknown unit names produce clear errors.
 """
 
@@ -21,7 +20,6 @@ from plant_sim.schema.units import (
     CustomLengthUnit,
     UnitSystem,
     known_length_units,
-    register_length_unit,
 )
 
 FIX = Path(__file__).parent / "fixtures"
@@ -103,28 +101,10 @@ def test_inline_custom_unit():
     assert hi_m == pytest.approx(1.2192)
 
 
-# ---- Programmatic registration for "unknown" systems ----
+# ---- Unknown unit name produces a clear error ----
 
-def test_register_length_unit_extends_built_ins():
-    register_length_unit("smoot", meters_per_unit=1.7018)
-    us = UnitSystem(length="smoot")
-    assert us.length_to_meters(1.0) == pytest.approx(1.7018)
-
-
-def test_register_unknown_unit_errors_until_registered():
+def test_unknown_unit_name_errors():
     us = UnitSystem(length="cubit")  # name validates as a string; conversion is lazy
     with pytest.raises(ValueError) as exc:
         us.length_to_meters(1.0)
     assert "Unknown length unit" in str(exc.value)
-
-
-def test_register_rejects_existing_unit():
-    with pytest.raises(ValueError):
-        register_length_unit("in", meters_per_unit=999.0)
-
-
-def test_register_rejects_zero_or_negative():
-    with pytest.raises(ValueError):
-        register_length_unit("zero_unit", meters_per_unit=0.0)
-    with pytest.raises(ValueError):
-        register_length_unit("neg_unit", meters_per_unit=-1.0)
