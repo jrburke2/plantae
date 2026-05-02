@@ -1,0 +1,35 @@
+# Phase 0/1 demo scene: a 50m × 100m rectangle in local-meters, mixing
+# a seed mix with a key-specimen-style species pin.
+#
+# Exercises every shape in the Scene schema:
+#   - boundary with Polygon geometry in local_meters
+#   - species_mix with both a MixEntry and a SpeciesEntry
+#   - key_specimens with a position in the same coord_system as boundary
+#   - auto_fill defaulted
+
+name: prairie_demo
+description: "Demonstration scene exercising the F36/F40-F42 schema with the Phase 0 reference species and the demo mix."
+
+scene_seed: PRAR1234
+
+boundary:
+  coord_system: local_meters
+  geometry:
+    type: Polygon
+    coordinates:
+      - [[0.0, 0.0], [50.0, 0.0], [50.0, 100.0], [0.0, 100.0], [0.0, 0.0]]
+
+species_mix:
+  - mix: restoration_demo_mix
+    application_rate:
+      value: 8
+      unit: lb_PLS_per_acre
+
+  - species: echinacea_purpurea
+    density_per_m2: 1
+    form: plug
+
+key_specimens:
+  - species: andropogon_gerardii
+    position: [25.0, 50.0]
+    exclusion_radius_m: 1.5

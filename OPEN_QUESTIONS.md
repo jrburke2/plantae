@@ -228,7 +228,7 @@ auto_fill:
   # min_distance_m per species derived from density (~1/sqrt(density))
 ```
 
-Code lands at `plant_sim/schema/scene.py` (new) during V2.2 implementation — Pydantic models matching the YAML, plus a `project_to_local_meters(boundary)` helper for the geographic → meters step at scene load.
+Code landed at `plant_sim/schema/scene.py` 2026-05-02 — Pydantic models for Boundary, GeoJSONPolygon/MultiPolygon, SpeciesEntry, MixEntry, KeySpecimen, AutoFillSpec, and Scene; plus a `project_to_local_meters(boundary)` helper using the flat-earth approximation around the polygon centroid. Cross-checks against the species/mix libraries (every species_mix.species and key_specimen.species exists; mix references resolve) deferred to the V2.2 scene loader.
 
 ---
 
