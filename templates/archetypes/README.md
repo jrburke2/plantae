@@ -163,6 +163,54 @@ by the exporter's `Renderable/shape mismatch` error — fast feedback.
 2. Add the archetype name to `ArchetypeName` literal and
    `_ARCHETYPE_TO_PARAMS` dict.
 3. Write `templates/archetypes/<name>.lpy.j2` following the conventions above.
+   Include a `template_version: 1.0.0` line in the leading Jinja comment
+   block (see "Template versioning" below).
 4. Write a reference-species YAML demonstrating the archetype.
 5. Add tests covering schema validation and template rendering.
 6. Document the archetype's parameter reference here.
+
+---
+
+## Template versioning
+
+Each archetype template carries a semver-shaped marker in its leading
+Jinja comment block:
+
+```
+{# rosette_scape_composite.lpy.j2
+
+template_version: 1.0.0
+...
+#}
+```
+
+The codegen extracts this version and bakes it into every generated
+`.lpy` as `extern(TEMPLATE_VERSION = "X.Y.Z")` plus
+`extern(TEMPLATE_ARCHETYPE = "<name>")`. The exporter passes both
+through into the sidecar JSON `meta`, and the viewer surfaces them next
+to the seed (e.g. `XQF2-D6S1 (rosette_scape_composite v1.0.0)`).
+
+### Bump rules
+
+- **Patch (1.2.x):** comment changes, refactors, parameter renames that
+  don't move the geometry produced for any committed seed.
+- **Minor (1.x.0):** new optional features or additive changes
+  (e.g. a new module that defaults off, an extra material slot).
+  Existing seeds still render the same plant.
+- **Major (x.0.0):** changes that produce visibly different plants for
+  existing seeds (e.g. switching the phyllotaxy formula, changing the
+  growth-window interpolation, swapping the RNG draw order).
+
+A future CI gate will detect bumps automatically by rendering a fixed
+`(template, seed)` regression set and comparing geometry hashes; for now
+the bump is a manual judgement call by the template author.
+
+### When to break vs. when to migrate
+
+A major bump is a *deliberate* break in seed → specimen reproducibility.
+For most edits — clarifying a comment, renaming a constant, adjusting
+template structure that doesn't move modules — patch suffices.
+
+When a major bump is unavoidable, V2.2+ will surface a "this plant
+looks different now because the template was updated" UI in the viewer,
+keyed off the version stored alongside the seed.

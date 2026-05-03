@@ -15,6 +15,7 @@ The persistent-marker pattern is applied via Jinja macros in
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 from jinja2 import Environment, FileSystemLoader, StrictUndefined
@@ -39,6 +40,33 @@ def available_archetypes() -> list[str]:
 
 def load_species(yaml_path: Path | str) -> Species:
     return Species.from_yaml(yaml_path)
+
+
+_TEMPLATE_VERSION_RE = re.compile(
+    r"\{#[^#]*?template_version:\s*(\d+\.\d+\.\d+)", re.DOTALL,
+)
+
+
+def template_version_for(species: Species) -> str:
+    """Extract the `template_version: X.Y.Z` marker from the archetype template.
+
+    Templates carry the marker in their leading Jinja comment block, e.g.
+    `{# template_version: 1.0.0 #}`. The version flows through codegen into
+    each generated .lpy and out to the sidecar JSON, so a saved seed knows
+    which template version produced it (V2 plan §4.3).
+
+    Raises ValueError if the template lacks the marker.
+    """
+    template_path = TEMPLATES_DIR / dispatch_template(species)
+    src = template_path.read_text(encoding="utf-8")
+    m = _TEMPLATE_VERSION_RE.search(src)
+    if not m:
+        raise ValueError(
+            f"Template {dispatch_template(species)!r} is missing a "
+            f"`{{# template_version: X.Y.Z #}}` marker. Add one to the "
+            f"leading Jinja comment block."
+        )
+    return m.group(1)
 
 
 def dispatch_template(species: Species) -> str:
@@ -140,6 +168,10 @@ def render_archetype(species: Species, render_ctx: RenderContext | None = None) 
         "species": species,
         "render": _build_render_extras(render_ctx),
         "m": _build_meters_dict(species),
+        "template": {
+            "archetype": species.archetype,
+            "version": template_version_for(species),
+        },
     }
     return template.render(**context)
 

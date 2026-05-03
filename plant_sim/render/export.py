@@ -177,6 +177,19 @@ def export_to_obj_with_sidecar(
     # Write sidecar
     sidecar_path = output_obj_path.with_suffix(".materials.json")
     meta = {"t_render": float(t_render), "scene_shape_count": len(scene)}
+    # Pull template metadata from the L-Py context if present. Codegen
+    # bakes TEMPLATE_ARCHETYPE / TEMPLATE_VERSION into every generated
+    # .lpy as externs (V2 plan §4.3); surfacing them in the sidecar lets
+    # the viewer show "(rosette_scape_composite v1.0.0)" next to the seed
+    # and lets future scenes detect template-version drift.
+    # LsysContext.get is a Boost.Python binding that requires an explicit
+    # default — the dict-style single-arg form raises ArgumentError.
+    arch = ctx.get("TEMPLATE_ARCHETYPE", None)
+    ver = ctx.get("TEMPLATE_VERSION", None)
+    if arch is not None:
+        meta["template_archetype"] = str(arch)
+    if ver is not None:
+        meta["template_version"] = str(ver)
     if sidecar_meta:
         meta.update(sidecar_meta)
     sidecar_path.write_text(json.dumps({

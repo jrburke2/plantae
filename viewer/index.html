@@ -28,6 +28,11 @@
     font-family: ui-monospace, monospace;
   }
   #seed-bar button:hover { background: rgba(255,255,255,0.2); }
+  #template-tag {
+    font-family: ui-monospace, monospace; font-size: 0.75rem;
+    opacity: 0.55; letter-spacing: 0.02em;
+  }
+  #template-tag:empty { display: none; }
   #seed-input { width: 7rem; text-transform: uppercase; cursor: text; }
   #seed-flash {
     font-size: 0.75rem; opacity: 0; transition: opacity 0.2s;
@@ -53,6 +58,7 @@
   <div id="seed-bar">
     <label>seed:</label>
     <span id="seed-display">--------</span>
+    <span id="template-tag" title="Archetype template + version that produced this specimen"></span>
     <button id="seed-copy" title="Copy seed">copy</button>
     <button id="seed-new" title="Generate fresh random seed">new</button>
     <input id="seed-input" placeholder="paste seed" maxlength="9" spellcheck="false">

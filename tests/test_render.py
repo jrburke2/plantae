@@ -154,6 +154,16 @@ def test_export_carries_meta_into_sidecar(tmp_path: Path, echinacea_derived):
     assert sidecar["meta"]["extra"] == "value"
 
 
+def test_sidecar_carries_template_archetype_and_version(tmp_path: Path, echinacea_derived):
+    """Sidecar surfaces TEMPLATE_ARCHETYPE / TEMPLATE_VERSION baked into the .lpy."""
+    lsys, lstring = echinacea_derived
+    obj_path = tmp_path / "version.obj"
+    _, out_sidecar = export_to_obj_with_sidecar(lsys, lstring, 200.0, obj_path)
+    sidecar = json.loads(out_sidecar.read_text())
+    assert sidecar["meta"]["template_archetype"] == "rosette_scape_composite"
+    assert sidecar["meta"]["template_version"] == "1.0.0"
+
+
 def test_export_boundary_case_at_inflo_peak(tmp_path: Path, echinacea_derived):
     """Regression: T_RENDER == INFLO_PEAK_DOY hits an age==0 ScapeSegment boundary.
 

@@ -25,6 +25,7 @@ from plant_sim.codegen.generator import (
     generate,
     load_species,
     render_archetype,
+    template_version_for,
     write,
 )
 from plant_sim.codegen.validator import validate_lpy
@@ -67,9 +68,13 @@ def arch(request) -> dict:
 
 
 @pytest.fixture(scope="module")
-def lpy_text(arch) -> str:
-    sp = Species.from_yaml(REPO / arch["yaml"])
-    return render_archetype(sp, RenderContext(seed=42))
+def species(arch) -> Species:
+    return Species.from_yaml(REPO / arch["yaml"])
+
+
+@pytest.fixture(scope="module")
+def lpy_text(species) -> str:
+    return render_archetype(species, RenderContext(seed=42))
 
 
 @pytest.fixture(scope="module")
@@ -100,8 +105,24 @@ def test_externs_declared(lpy_text):
     for name in (
         "T_RENDER", "SPECIMEN_SEED", "TIME_OFFSET_DOY",
         "EMERGENCE_OFFSET", "POSITION_X_M", "POSITION_Y_M", "POSITION_Z_M",
+        "TEMPLATE_ARCHETYPE", "TEMPLATE_VERSION",
     ):
         assert f"extern({name}" in lpy_text, f"missing extern({name}=...)"
+
+
+def test_template_version_extracted(species: Species):
+    v = template_version_for(species)
+    # Format: X.Y.Z (semver-shaped)
+    parts = v.split(".")
+    assert len(parts) == 3 and all(p.isdigit() for p in parts), (
+        f"template_version {v!r} not in X.Y.Z form"
+    )
+
+
+def test_template_version_baked_into_lpy(species: Species, lpy_text: str):
+    v = template_version_for(species)
+    assert f'extern(TEMPLATE_VERSION = "{v}")' in lpy_text
+    assert f'extern(TEMPLATE_ARCHETYPE = "{species.archetype}")' in lpy_text
 
 
 def test_generated_lpy_passes_static_validator(lpy_text):
@@ -184,6 +205,7 @@ def test_write_runs_validator_and_blocks_on_error(tmp_path: Path):
     """If the validator finds errors, write() should raise and not produce a file."""
     bad = tmp_path / "bad.lpy.j2"
     bad.write_text(
+        "{# template_version: 0.0.0 #}\n"
         "module Plant(t)\n"
         "production:\n"
         "Plant(t) :\n"

@@ -116,6 +116,14 @@ async function loadFrame(t) {
     setSeedDisplay(sidecar.meta.seed_display);
     SEED = sidecar.meta.seed;  // canonical form for subsequent fetches
   }
+
+  setTemplateTag(sidecar.meta.template_archetype, sidecar.meta.template_version);
+}
+
+function setTemplateTag(archetype, version) {
+  const el = document.getElementById('template-tag');
+  if (!el) return;
+  el.textContent = (archetype && version) ? `(${archetype} v${version})` : '';
 }
 
 // === Seed UI ===
