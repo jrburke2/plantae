@@ -41,3 +41,6 @@ jobs:
 
       - name: Run pytest
         run: pytest -v
+
+      - name: Cross-runtime parity (PCG + Seed.derive, Python vs JS)
+        run: node --test viewer/test/parity.test.mjs
