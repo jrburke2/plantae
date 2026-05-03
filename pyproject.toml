@@ -25,4 +25,4 @@ dev = ["pytest"]
 plant-sim = "plant_sim.cli:main"
 
 [tool.setuptools]
-packages = ["plant_sim", "plant_sim.schema", "plant_sim.codegen", "plant_sim.render", "plant_sim.server", "growth_functions"]
+packages = ["plant_sim", "plant_sim.schema", "plant_sim.codegen", "plant_sim.render", "plant_sim.runtime", "plant_sim.server", "growth_functions"]

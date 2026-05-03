@@ -12,8 +12,8 @@ Conventions:    Y-up, meters internal, degrees angles, DOY time
 #}
 {% from "macros/queryable.lpy.j2" import one_shot as queryable_one_shot %}
 import math
-import random
 from growth_functions import sigmoid_grow, alpha_at, draw_growth_days
+from plant_sim.runtime.pcg import seeded_rng
 
 # === Externs (overridden from Python via lsys.context()) ===
 extern(T_RENDER = {{ "%.1f" % render.t_render_default }})
@@ -25,7 +25,8 @@ extern(POSITION_Y_M = {{ "%.4f" % render.position_y_m }})
 extern(POSITION_Z_M = {{ "%.4f" % render.position_z_m }})
 
 # === Per-specimen RNG seeded once at file top ===
-random.seed(SPECIMEN_SEED)
+# PCG-XSL-RR-128/64 — portable across Python (here) and TypeScript (V2.1+).
+rng = seeded_rng(SPECIMEN_SEED)
 
 # === Phenology (median DOY values from species YAML) ===
 LEAF_FLUSH_DOY = {{ species.phenology.leaf_flush_doy }}
@@ -64,13 +65,13 @@ INFLO_BUD_GROWTH_DAYS = 5.0
 SCAPE_SEGMENT_COUNT = 30
 
 # === Per-specimen stochastic draws (same seed -> bit-identical specimen) ===
-ROSETTE_LEAVES = random.randint(ROSETTE_LEAF_COUNT_MIN, ROSETTE_LEAF_COUNT_MAX)
-SCAPE_COUNT = random.randint(SCAPE_COUNT_MIN, SCAPE_COUNT_MAX)
-SCAPE_HEIGHT_M = random.uniform(SCAPE_HEIGHT_MIN_M, SCAPE_HEIGHT_MAX_M)
+ROSETTE_LEAVES = rng.randint(ROSETTE_LEAF_COUNT_MIN, ROSETTE_LEAF_COUNT_MAX)
+SCAPE_COUNT = rng.randint(SCAPE_COUNT_MIN, SCAPE_COUNT_MAX)
+SCAPE_HEIGHT_M = rng.uniform(SCAPE_HEIGHT_MIN_M, SCAPE_HEIGHT_MAX_M)
 SCAPE_SEGMENT_LEN_M = SCAPE_HEIGHT_M / SCAPE_SEGMENT_COUNT
-ROSETTE_LEAF_MAX_LEN_M = random.uniform(ROSETTE_LEAF_LEN_MIN_M, ROSETTE_LEAF_LEN_MAX_M)
-RAY_COUNT = random.randint(RAY_COUNT_MIN, RAY_COUNT_MAX)
-DISK_RADIUS_M = random.uniform(INFLORESCENCE_DIAMETER_MIN_M, INFLORESCENCE_DIAMETER_MAX_M) / 2.0
+ROSETTE_LEAF_MAX_LEN_M = rng.uniform(ROSETTE_LEAF_LEN_MIN_M, ROSETTE_LEAF_LEN_MAX_M)
+RAY_COUNT = rng.randint(RAY_COUNT_MIN, RAY_COUNT_MAX)
+DISK_RADIUS_M = rng.uniform(INFLORESCENCE_DIAMETER_MIN_M, INFLORESCENCE_DIAMETER_MAX_M) / 2.0
 RAY_LEN_M = DISK_RADIUS_M * 1.5  # rays are ~1.5x disk radius for composites
 CAULINE_LEAF_LEN_M = ROSETTE_LEAF_MAX_LEN_M * 0.4
 

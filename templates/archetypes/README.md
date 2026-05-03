@@ -76,7 +76,7 @@ The codegen always passes these via `extern(...)`. Templates reference them:
 
 ```
 extern(T_RENDER = 180.0)            # slider time, fractional DOY (1..366)
-extern(SPECIMEN_SEED = 42)          # random.seed(SPECIMEN_SEED) at file top
+extern(SPECIMEN_SEED = 42)          # rng = seeded_rng(SPECIMEN_SEED) at file top
 extern(TIME_OFFSET_DOY = 0.0)       # for specimens established in prior years
 extern(EMERGENCE_OFFSET = 0.0)      # per-specimen jitter around phenology medians
 extern(POSITION_X_M = 0.0)
@@ -88,9 +88,15 @@ Phase 0 only ever sets `T_RENDER` from the slider; the rest stay at
 defaults. Phase 3 scene composer sets per-specimen values to compose
 communities. Templates should NOT hardcode any of these.
 
-`EMERGENCE_OFFSET` is set by the codegen to `random.gauss(0, jitter)` once
-per specimen, after `random.seed(SPECIMEN_SEED)`. Phase 0 jitter is 0
-(no variation); Phase 1 reads `phenology.emergence_jitter_days` from YAML.
+`EMERGENCE_OFFSET` is set by the codegen to a per-specimen Gaussian draw
+(jitter scale from species YAML), seeded by `SPECIMEN_SEED` via
+`plant_sim.runtime.pcg.seeded_rng`. Phase 0 jitter is 0 (no variation);
+Phase 1 reads `phenology.emergence_jitter_days` from YAML.
+
+Templates use the portable PCG-XSL-RR-128/64 RNG via
+`from plant_sim.runtime.pcg import seeded_rng` and a single `rng =
+seeded_rng(SPECIMEN_SEED)` at file top. Same algorithm in Python (here)
+and TypeScript (V2.1+ browser runtime), gated by a CI parity test.
 
 ### Module declaration discipline
 

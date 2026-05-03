@@ -17,8 +17,8 @@ so each is queryable in the final lstring.
 #}
 {% from "macros/queryable.lpy.j2" import one_shot as queryable_one_shot %}
 import math
-import random
 from growth_functions import sigmoid_grow, alpha_at, draw_growth_days
+from plant_sim.runtime.pcg import seeded_rng
 
 # === Externs (overridden from Python via lsys.context()) ===
 extern(T_RENDER = {{ "%.1f" % render.t_render_default }})
@@ -30,7 +30,8 @@ extern(POSITION_Y_M = {{ "%.4f" % render.position_y_m }})
 extern(POSITION_Z_M = {{ "%.4f" % render.position_z_m }})
 
 # === Per-specimen RNG seeded once at file top ===
-random.seed(SPECIMEN_SEED)
+# PCG-XSL-RR-128/64 — portable across Python (here) and TypeScript (V2.1+).
+rng = seeded_rng(SPECIMEN_SEED)
 
 # === Phenology (median DOY values from species YAML) ===
 LEAF_FLUSH_DOY = {{ species.phenology.leaf_flush_doy }}
@@ -110,17 +111,17 @@ Clump(t_doy, fired) :
         produce Clump(t_doy + 1, fired)
 
 # TillerBundle: recursive emitter; each Tiller draws its stochastic params
-# at production firing (random.uniform / random.randint baked into Tiller's
+# at production firing (rng.uniform / rng.randint baked into Tiller's
 # parameters per Andropogon Q2 finding).
 TillerBundle(n_remaining, n_total, t_birth, frac_flowering) :
     if n_remaining > 0:
-        height_m = random.uniform(TILLER_HEIGHT_MIN_M, TILLER_HEIGHT_MAX_M)
-        n_leaves = random.randint(LEAF_COUNT_MIN, LEAF_COUNT_MAX)
-        is_flowering = random.random() < frac_flowering
+        height_m = rng.uniform(TILLER_HEIGHT_MIN_M, TILLER_HEIGHT_MAX_M)
+        n_leaves = rng.randint(LEAF_COUNT_MIN, LEAF_COUNT_MAX)
+        is_flowering = rng.random() < frac_flowering
         idx = n_total - n_remaining
         base_angle = idx * (360.0 / n_total)
-        jitter = random.uniform(-10, 10)
-        elevation = random.uniform(0, 8)
+        jitter = rng.uniform(-10, 10)
+        elevation = rng.uniform(0, 8)
         produce [/(base_angle + jitter) +(elevation) Tiller(idx, t_birth, height_m, n_leaves, is_flowering, False)] TillerBundle(n_remaining - 1, n_total, t_birth, frac_flowering)
     else:
         produce *
@@ -159,7 +160,7 @@ LeafLadder(n_remaining, n_total, t_birth, tiller_height_m) :
 CulmStem(t_birth, max_height_m) :
     current_t = getIterationNb()
     if current_t >= EFFECTIVE_INFLO_EMERGE:
-        n_racemes = random.randint(RACEME_COUNT_MIN, RACEME_COUNT_MAX)
+        n_racemes = rng.randint(RACEME_COUNT_MIN, RACEME_COUNT_MAX)
         produce CulmSegment(current_t, max_height_m * 0.15, CULM_MAT) Panicle(current_t, n_racemes, False)
     else:
         produce CulmStem(t_birth, max_height_m)
