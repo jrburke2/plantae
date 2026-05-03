@@ -127,3 +127,87 @@ def test_seed_works_in_pydantic_model():
 
     # Serialization uses canonical form
     assert h1.model_dump()["seed"] == "XQF2D6S1"
+
+
+# ---- Hierarchical derivation (V2.0 foundation) ----
+
+def test_derive_is_deterministic():
+    parent = Seed("XQF2D6S1")
+    a = parent.derive("specimen", 0)
+    b = parent.derive("specimen", 0)
+    assert a == b
+
+
+def test_derive_different_salts_diverge():
+    parent = Seed("XQF2D6S1")
+    a = parent.derive("specimen", 0)
+    b = parent.derive("specimen", 1)
+    c = parent.derive("rosette_leaf", 0)
+    assert a != b != c
+    assert a != c
+
+
+def test_derive_different_parents_diverge():
+    a = Seed("XQF2D6S1").derive("specimen", 0)
+    b = Seed("XQF2D6S2").derive("specimen", 0)
+    assert a != b
+
+
+def test_derive_str_and_int_salts_distinct():
+    """derive("42") must not collide with derive(42); type-tag enforces this."""
+    parent = Seed(0)
+    assert parent.derive("42") != parent.derive(42)
+
+
+def test_derive_no_concatenation_collision():
+    """derive("ab") must not collide with derive("a", "b"); separator enforces this."""
+    parent = Seed(0)
+    assert parent.derive("ab") != parent.derive("a", "b")
+
+
+def test_derive_returns_valid_seed():
+    s = Seed("XQF2D6S1").derive("anything")
+    assert 0 <= s.to_int() <= SEED_MAX
+    assert len(s.canonical()) == SEED_LEN
+
+
+def test_derive_with_no_salts():
+    """Zero-arg derive is allowed; it stretches the parent through the hash."""
+    parent = Seed(42)
+    child = parent.derive()
+    assert child != parent  # vanishingly small chance of collision
+    # And it's deterministic
+    assert child == Seed(42).derive()
+
+
+@pytest.mark.parametrize("bad_int", [-1, 1 << 64, (1 << 64) + 1])
+def test_derive_rejects_int_out_of_range(bad_int):
+    with pytest.raises(ValueError, match=r"\[0, 2\*\*64\)"):
+        Seed(0).derive(bad_int)
+
+
+def test_derive_rejects_bool():
+    """bool is an int subclass in Python; reject so derive(True) doesn't silently encode as 1."""
+    with pytest.raises(TypeError, match="bool"):
+        Seed(0).derive(True)
+
+
+def test_derive_rejects_other_types():
+    with pytest.raises(TypeError, match="str or int"):
+        Seed(0).derive(3.14)
+    with pytest.raises(TypeError, match="str or int"):
+        Seed(0).derive(("tuple",))
+
+
+def test_derive_chain():
+    """specimen_seed = scene_seed.derive("specimen", i); leaf_seed = specimen_seed.derive(...)"""
+    scene = Seed("PRAR1234")
+    specimen = scene.derive("specimen", 0)
+    leaf = specimen.derive("rosette_leaf", 0)
+    # All distinct
+    assert scene != specimen != leaf
+    assert scene != leaf
+    # Determinism through the chain
+    specimen2 = scene.derive("specimen", 0)
+    leaf2 = specimen2.derive("rosette_leaf", 0)
+    assert leaf == leaf2

@@ -21,6 +21,7 @@ Backward compatibility:
 
 from __future__ import annotations
 
+import hashlib
 import os
 import re
 from typing import Any
@@ -84,6 +85,63 @@ class Seed:
         """Human-friendly with mid-string hyphen, e.g. 'XQF2-D6S1'."""
         c = self.canonical()
         return f"{c[:DISPLAY_SPLIT]}-{c[DISPLAY_SPLIT:]}"
+
+    def derive(self, *salts: "str | int") -> "Seed":
+        """Deterministic child seed from (self, salts...).
+
+        Same parent + same salts always returns the same child. Different
+        salts produce uncorrelated children.
+
+        Encoding (frozen — changing it is a breaking change to every
+        committed seed-derived artifact):
+
+            sha256(
+                parent.canonical (ASCII)
+                || NUL || tag(salt_1) || bytes(salt_1)
+                || NUL || tag(salt_2) || bytes(salt_2)
+                ...
+            )[:5]   # take the first 5 bytes, big-endian → 40-bit Seed
+
+        Tags: `b"s"` for str (UTF-8 body), `b"i"` for int (big-endian 8-byte
+        unsigned). The tag byte makes `derive("42") != derive(42)` and the
+        NUL separator prevents `derive("ab")` colliding with `derive("a",
+        "b")` from concatenation.
+
+        SHA-256 is used (not blake3) because it's stdlib in Python and
+        native in browser Web Crypto, costing zero new dependencies on
+        either runtime. For a 40-bit output, the cryptographic difference
+        between SHA-256 and blake3 is not load-bearing.
+
+        Use sites:
+          - scene_seed.derive("specimen", i)        per placement
+          - specimen_seed.derive("rosette_leaf", j) per organ stream
+          - specimen_seed.derive(f"archetype:{name}@{version}")
+                                                    template-version drift
+        """
+        h = hashlib.sha256()
+        h.update(self.canonical().encode("ascii"))
+        for s in salts:
+            h.update(b"\x00")
+            if isinstance(s, bool):
+                # bool is a subclass of int in Python; reject explicitly so
+                # `derive(True)` doesn't silently encode as int 1.
+                raise TypeError("salt must be str or int, not bool")
+            elif isinstance(s, str):
+                h.update(b"s")
+                h.update(s.encode("utf-8"))
+            elif isinstance(s, int):
+                if not 0 <= s < (1 << 64):
+                    raise ValueError(
+                        f"int salt must be in [0, 2**64); got {s}"
+                    )
+                h.update(b"i")
+                h.update(s.to_bytes(8, "big", signed=False))
+            else:
+                raise TypeError(
+                    f"salt must be str or int; got {type(s).__name__}"
+                )
+        n = int.from_bytes(h.digest()[:5], "big")
+        return Seed(n & SEED_MAX)
 
     def __int__(self) -> int:
         return self._int
