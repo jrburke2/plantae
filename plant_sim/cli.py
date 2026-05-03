@@ -1,7 +1,7 @@
 """plant-sim CLI entry point.
 
 Phase 0 progress:
-  validate     [Step 2]  schema-validate a species YAML
+  validate     [Step 2]  schema-validate a YAML (species, mix, or scene); cross-checks for mix/scene
   schema-json  [Step 2]  emit JSON Schema for IDE tooling
   generate     [Step 4]  YAML -> .lpy (calls codegen, runs validator, writes file)
   render       [Step 5]  .lpy -> OBJ + materials.json sidecar (stub)
@@ -13,8 +13,15 @@ import sys
 from pathlib import Path
 
 import click
+import yaml
 from pydantic import ValidationError as PydanticValidationError
 
+from plant_sim.codegen.cross_check import (
+    MixLibrary,
+    SpeciesLibrary,
+    check_mix_against_species,
+    check_scene_against_libs,
+)
 from plant_sim.codegen.generator import (
     available_archetypes,
     load_species,
@@ -25,11 +32,30 @@ from plant_sim.codegen.validator import (
     ValidationError as LpyValidationError,
     collect_material_ids,
 )
+from plant_sim.schema.mix import Mix
+from plant_sim.schema.scene import Scene
 from plant_sim.schema.seed import Seed
 from plant_sim.schema.species import Species
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_MATERIALS_LIB = REPO_ROOT / "materials" / "library.json"
+DEFAULT_SPECIES_DIR = REPO_ROOT / "species"
+DEFAULT_MIX_DIR = REPO_ROOT / "mixes"
+
+
+def _detect_yaml_kind(yaml_path: Path) -> str:
+    """Return 'species', 'mix', 'scene', or 'unknown' based on top-level keys."""
+    with yaml_path.open(encoding="utf-8") as f:
+        data = yaml.safe_load(f)
+    if not isinstance(data, dict):
+        return "unknown"
+    if "scientific_name" in data:
+        return "species"
+    if "boundary" in data:
+        return "scene"
+    if "components" in data:
+        return "mix"
+    return "unknown"
 
 
 @click.group()
@@ -39,22 +65,86 @@ def main() -> None:
 
 
 @main.command()
-@click.argument("species_yaml", type=click.Path(exists=True, dir_okay=False))
-def validate(species_yaml: str) -> None:
-    """Schema-validate a species YAML and print a summary."""
-    try:
-        sp = load_species(species_yaml)
-    except PydanticValidationError as e:
-        click.echo(f"INVALID: {species_yaml}", err=True)
-        click.echo(str(e), err=True)
-        sys.exit(1)
-    click.echo(f"OK: {species_yaml}")
-    click.echo(f"  scientific_name : {sp.scientific_name}")
-    click.echo(f"  archetype       : {sp.archetype}")
-    click.echo(f"  units.length    : {sp.units.length}")
-    click.echo(f"  height_range    : {sp.height_range} ({sp.units.length_range_to_meters(sp.height_range)} m)")
-    if sp.template_override:
-        click.echo(f"  template_override: {sp.template_override}")
+@click.argument("yaml_file", type=click.Path(exists=True, dir_okay=False))
+@click.option("--species-dir", type=click.Path(exists=True, file_okay=False),
+              default=str(DEFAULT_SPECIES_DIR),
+              help="Species library root (used for mix/scene cross-checks).")
+@click.option("--mix-dir", type=click.Path(file_okay=False),
+              default=str(DEFAULT_MIX_DIR),
+              help="Mix library root (used for scene cross-checks). Missing dir is OK.")
+def validate(yaml_file: str, species_dir: str, mix_dir: str) -> None:
+    """Schema-validate a YAML (species, mix, or scene) and run cross-checks.
+
+    Detects the YAML kind by top-level keys:
+      scientific_name -> species; boundary -> scene; components -> mix.
+    """
+    path = Path(yaml_file)
+    kind = _detect_yaml_kind(path)
+
+    if kind == "species":
+        try:
+            sp = load_species(path)
+        except PydanticValidationError as e:
+            click.echo(f"INVALID: {yaml_file}", err=True)
+            click.echo(str(e), err=True)
+            sys.exit(1)
+        click.echo(f"OK: {yaml_file}")
+        click.echo(f"  scientific_name : {sp.scientific_name}")
+        click.echo(f"  archetype       : {sp.archetype}")
+        click.echo(f"  units.length    : {sp.units.length}")
+        click.echo(f"  height_range    : {sp.height_range} ({sp.units.length_range_to_meters(sp.height_range)} m)")
+        if sp.template_override:
+            click.echo(f"  template_override: {sp.template_override}")
+        return
+
+    if kind == "mix":
+        try:
+            mix = Mix.from_yaml(path)
+        except (PydanticValidationError, ValueError) as e:
+            click.echo(f"INVALID MIX: {yaml_file}", err=True)
+            click.echo(str(e), err=True)
+            sys.exit(1)
+        species_lib = SpeciesLibrary.load(species_dir)
+        issues = check_mix_against_species(mix, species_lib)
+        if issues:
+            click.echo(f"INVALID MIX (cross-check): {yaml_file}", err=True)
+            for i in issues:
+                click.echo(f"  {i.message}", err=True)
+            sys.exit(1)
+        click.echo(f"OK: {yaml_file}")
+        click.echo(f"  mix             : {mix.name}")
+        click.echo(f"  components      : {len(mix.components)}")
+        click.echo(f"  grade           : {mix.grade.value}")
+        return
+
+    if kind == "scene":
+        try:
+            scene = Scene.from_yaml(path)
+        except PydanticValidationError as e:
+            click.echo(f"INVALID SCENE: {yaml_file}", err=True)
+            click.echo(str(e), err=True)
+            sys.exit(1)
+        species_lib = SpeciesLibrary.load(species_dir)
+        mix_lib = MixLibrary.load(mix_dir)
+        issues = check_scene_against_libs(scene, species_lib, mix_lib)
+        if issues:
+            click.echo(f"INVALID SCENE (cross-check): {yaml_file}", err=True)
+            for i in issues:
+                click.echo(f"  {i.message}", err=True)
+            sys.exit(1)
+        click.echo(f"OK: {yaml_file}")
+        click.echo(f"  scene           : {scene.name}")
+        click.echo(f"  coord_system    : {scene.boundary.coord_system}")
+        click.echo(f"  species_mix     : {len(scene.species_mix)} entries")
+        click.echo(f"  key_specimens   : {len(scene.key_specimens)}")
+        return
+
+    click.echo(
+        f"ERROR: could not detect YAML kind for {yaml_file}. "
+        f"Expected a species (scientific_name), mix (components), or scene (boundary).",
+        err=True,
+    )
+    sys.exit(1)
 
 
 @main.command("schema-json")
