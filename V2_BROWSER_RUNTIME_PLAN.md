@@ -66,9 +66,9 @@ species/<family>/<species>.yaml                   (UNCHANGED — botanist surfac
         +
 templates/archetypes/<archetype>.lpy.j2           (BECOMES OPTIONAL —
                                                    kept for L-Py dev path)
-templates/archetypes/<archetype>.ts.j2            (NEW — TS emission target)
+templates/archetypes/<archetype>.js.j2            (NEW — browser emission target)
         ↓ codegen (Jinja2)
-generated/ts/<species>_<seed>.ts                  (NEW — generated TS module)
+generated/js/<species>_<seed>.js                  (NEW — generated ESM module)
         ↓ Browser ES module import
         Browser-side generate(seed, t) function
         ↓
@@ -91,11 +91,11 @@ applyMaterialsToObject(obj, sidecar?, library, t)  (UPDATED to derive sidecar
 
 **What changes:**
 - Codegen gains a new emission target. Existing `generator.py` grows a
-  `--target ts` mode alongside the default `--target lpy`.
-- New TS templates per archetype, mirroring the L-Py templates structurally.
-- New runtime helpers as TypeScript modules: PRNG, Seed.derive,
-  growth functions (sigmoid_grow, alpha_at), turtle interpreter for the
-  small subset we need.
+  `--target js` mode alongside the default `--target lpy`.
+- New JS templates per archetype, mirroring the L-Py templates structurally.
+- New runtime helpers as ESM JS modules with JSDoc types: PRNG (V2.0),
+  Seed.derive (V2.0), growth functions (sigmoid_grow, alpha_at), turtle
+  interpreter for the small subset we need.
 - Viewer's `loadFrame()` swaps from "fetch OBJ" to "import generated module
   + call generate()."
 
@@ -122,12 +122,13 @@ because the algorithm is a few well-defined integer operations.
 
 **Implementation tasks:**
 - `plant_sim/runtime/pcg.py` — PCG implementation matching the canonical spec
-- `plant_sim/runtime/pcg.ts` — JS/TS port producing bit-identical output
+- `viewer/pcg.js` — bit-identical JS port (ESM, JSDoc-typed, no build step;
+  see §4.4 on the file-extension choice)
 - A test suite (Python + Node) that verifies cross-runtime parity for 1000
   arbitrary seeds × 1000 draws each
 - The generated `.lpy` files transitionally use `from plant_sim.runtime.pcg
-  import seeded_rng` instead of `random.seed`. The generated TS files use
-  the same PCG.
+  import seeded_rng` instead of `random.seed`. The generated browser-side
+  files use the same PCG.
 
 ### 4.2 Hierarchical seed derivation
 
@@ -154,11 +155,18 @@ class Seed:
   template version changes deterministically shift the seed (see §4.3)
 
 **Implementation tasks:**
-- `Seed.derive(salt)` in `plant_sim/schema/seed.py`
-- TS port in `viewer/seed.ts`
+- `Seed.derive(*salts)` in `plant_sim/schema/seed.py`
+- JS port in `viewer/seed.js` (async, since `crypto.subtle.digest` is async)
 - Cross-runtime parity test
 - A small documentation note in the seed module explaining the hash function
   choice and warning that changing it is a breaking change
+
+**Hash choice (V2.0 resolution).** The original spec called for blake3.
+We shipped SHA-256 truncated to 40 bits instead: it's stdlib in Python
+(`hashlib.sha256`) and native in browsers (`crypto.subtle.digest('SHA-256',
+…)`), zero new deps either side. For a 40-bit-output derivation,
+blake3's properties are not load-bearing. Documented as a breaking-change
+parameter in `seed.py`.
 
 ### 4.3 Template versioning
 
@@ -173,7 +181,7 @@ Each `templates/archetypes/<archetype>.{lpy,ts}.j2` carries:
 {# template_version: 1.2.0 #}
 ```
 
-Generated artifacts (.lpy, .ts, sidecar) include this version. Viewer
+Generated artifacts (.lpy, .js, sidecar) include this version. Viewer
 displays it next to the seed: `seed: XQF2-D6S1 (rosette_scape_composite v1.2.0)`.
 
 When loading a seed, viewer checks: was this seed previously rendered against
@@ -192,46 +200,52 @@ of (template, seed) regression cases and comparing geometry hashes.
 
 ## 5. Migration phases
 
-### V2.0 — PRNG + Seed.derive (foundation, ~1 week)
+### V2.0 — PRNG + Seed.derive (foundation, ~1 week) — SHIPPED 2026-05-03
 
-- [ ] Pick PCG variant (likely PCG-XSL-RR-128/64 for 64-bit output truncated
-      to our 40-bit seed space)
-- [ ] Implement Python PCG in `plant_sim/runtime/pcg.py`
-- [ ] Implement TS PCG in `viewer/pcg.ts`
-- [ ] Implement `Seed.derive(salt)` Python + TS, with parity test
-- [ ] Update generated `.lpy` files to use PCG via the `pcg` module rather
-      than `random.seed`. **L-Py path keeps working, just on a different RNG.**
-- [ ] Migration: existing pre-baked seeds need to be re-baked under PCG.
-      Document as one-time artifact churn.
+- [x] Pick PCG variant (PCG-XSL-RR-128/64 with canonical pcg-cpp constants;
+      stream id locked at `PCG_DEFAULT_STREAM_128`)
+- [x] Implement Python PCG in `plant_sim/runtime/pcg.py`
+- [x] Implement JS PCG in `viewer/pcg.js`
+- [x] Implement `Seed.derive(*salts)` Python + JS, with parity test (CI gate
+      via `node --test viewer/test/parity.test.mjs`)
+- [x] Update generated `.lpy` files to use PCG via `seeded_rng` rather than
+      `random.seed`. **L-Py path keeps working, just on a different RNG.**
+- [x] Migration: pre-baked seeds re-baked. Documented as one-time artifact
+      churn in the templates README.
 
-**Checkpoint:** server still works, but with reproducible outputs across
-languages. Adding a TS runtime later doesn't risk seed-output drift.
+**Checkpoint hit:** server runs identically with PCG underneath; cross-
+runtime parity gated in CI on every push.
 
-### V2.1 — Codegen TS target (one archetype, ~3 weeks)
+### V2.1 — Codegen JS target (one archetype, ~3 weeks)
 
 - [ ] Pick archetype to convert first (recommend rosette_scape_composite —
       simpler, smaller surface)
-- [ ] Design TS runtime API:
-  ```ts
-  generate(seed: string, t_render: number, render_ctx?: RenderContext): GenerateResult
-  type GenerateResult = { geometry: THREE.Object3D, materials: { [shapeName: string]: string } }
+- [ ] Design JS runtime API (JSDoc-typed for editor support, no transpile):
+  ```js
+  /**
+   * @param {string} seed
+   * @param {number} t_render
+   * @param {RenderContext} [render_ctx]
+   * @returns {{ geometry: THREE.Object3D, materials: Record<string,string> }}
+   */
+  function generate(seed, t_render, render_ctx) { … }
   ```
-- [ ] Implement TS-side helpers: PCG, Seed, growth_functions (sigmoid_grow,
-      alpha_at, draw_growth_days), Turtle (the subset we need: F, ~l, @O, [, ],
-      /, +, &, ;)
-- [ ] Add `--target=ts` to `plant_sim generate` CLI
-- [ ] Author `templates/archetypes/rosette_scape_composite.ts.j2`
+- [ ] Implement JS-side helpers: PCG (shipped V2.0), Seed (shipped V2.0),
+      growth_functions (sigmoid_grow, alpha_at, draw_growth_days), Turtle
+      (the subset we need: F, ~l, @O, [, ], /, +, &, ;)
+- [ ] Add `--target=js` to `plant_sim generate` CLI
+- [ ] Author `templates/archetypes/rosette_scape_composite.js.j2`
 - [ ] Add a test that renders Echinacea via both targets at the same (seed, t)
       and asserts geometry parity (vertex positions within tolerance)
-- [ ] Viewer gains a `?runtime=ts|server` URL flag; defaults to server during
+- [ ] Viewer gains a `?runtime=js|server` URL flag; defaults to server during
       this phase
 
 **Checkpoint:** rosette_scape_composite renders identically in browser and
 server for a fixed test set.
 
-### V2.2 — Codegen TS target (second archetype + scene composer, ~4 weeks)
+### V2.2 — Codegen JS target (second archetype + scene composer, ~4 weeks)
 
-- [ ] Author `templates/archetypes/tiller_clump.ts.j2`
+- [ ] Author `templates/archetypes/tiller_clump.js.j2`
 - [ ] Both reference species render in browser
 - [ ] Implement scene/community spec (REQUIREMENTS F36, F40-F42):
   ```yaml
@@ -335,14 +349,25 @@ V2 is complete when, on a fresh checkout / web visit:
 
 ## 8. Open questions
 
-1. **TS bundler choice (resolved 2026-05-02).** No-build raw ESM through
-   V2.0 and V2.1 — the viewer already runs no-build with native browser
-   imports. Adopt esbuild only when bundle pain is concrete (transfer
-   approaching the 2 MB compressed budget per §7.6, or HTTP/2 multiplexing
-   not absorbing the request count on real connections). Vite considered
-   only if esbuild's seams don't fit. P3 — deps earn their way; the
-   bundler doesn't earn its way prophylactically. See OPEN_QUESTIONS
-   audit item (e).
+1. **Bundler / file-extension choice (resolved 2026-05-02 / 2026-05-03).**
+   No-build raw ESM through V2.0 and V2.1 — the viewer already runs
+   no-build with native browser imports. Adopt esbuild only when bundle
+   pain is concrete (transfer approaching the 2 MB compressed budget per
+   §7.6, or HTTP/2 multiplexing not absorbing the request count on real
+   connections). Vite considered only if esbuild's seams don't fit. P3 —
+   deps earn their way; the bundler doesn't earn its way prophylactically.
+   See OPEN_QUESTIONS audit item (e).
+
+   **File-extension corollary (2026-05-03):** browsers don't execute `.ts`
+   natively, so "no-build raw ESM" forces `.js` files for everything
+   shipped to the viewer. V2.0 ships `viewer/pcg.js` and `viewer/seed.js`
+   with JSDoc type annotations; editor support stays via `tsc --noEmit
+   --allowJs --checkJs` if anyone wants types in CI. V2.1+ archetype
+   codegen targets follow the same convention: emit `.js`, not `.ts`,
+   until/unless a build step is introduced explicitly. The plan's prose
+   still says "TS" as shorthand for "TypeScript-flavored runtime
+   alongside Python" — read it as "browser-side JS that mirrors the
+   Python contract."
 2. **Web Worker isolation.** Should `generate()` run in a Web Worker so
    the main thread stays responsive during slider scrubs? Probably yes for
    community renders >50 specimens, no for single-specimen.
