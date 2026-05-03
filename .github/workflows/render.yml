@@ -15,6 +15,10 @@ on:
       - 'plant_sim/render/**'
       - 'materials/library.json'
 
+env:
+  # Opt into Node.js 24 ahead of the June 2026 default flip.
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+
 jobs:
   render-changed-species:
     runs-on: ubuntu-latest
@@ -37,6 +41,8 @@ jobs:
           activate-environment: plant_sim
           miniforge-version: latest
           use-mamba: true
+          # Don't implicitly add the `defaults` channel.
+          conda-remove-defaults: 'true'
 
       - name: Install package
         run: pip install -e .

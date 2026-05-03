@@ -10,6 +10,11 @@
 #
 # On Linux x86_64 / Windows / macOS Intel: drop the CONDA_SUBDIR= prefix.
 #
+# `pip install -e .` is a separate step (not declared via a pip block in this
+# file) so libmamba doesn't emit its "pip as additional package manager"
+# warning during env creation. CI workflows do the editable install in a
+# dedicated step.
+#
 # This mirrors the spike's lpy_spike env (validated 2026-05-02 across Echinacea
 # and Andropogon spikes). Versions left unpinned for first solve; pin once the
 # env solves on a clean machine.
@@ -41,6 +46,4 @@ dependencies:
   # Test
   - pytest
 
-  - pip
-  - pip:
-    - -e .
+  - pip   # editable install of plant_sim itself runs as a separate `pip install -e .` step
