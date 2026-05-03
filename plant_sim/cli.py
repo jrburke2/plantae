@@ -156,7 +156,7 @@ def schema_json(output: str) -> None:
     out_path = Path(output)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     schema = Species.model_json_schema()
-    out_path.write_text(json.dumps(schema, indent=2))
+    out_path.write_text(json.dumps(schema, indent=2), encoding="utf-8")
     click.echo(f"Wrote {out_path}")
 
 

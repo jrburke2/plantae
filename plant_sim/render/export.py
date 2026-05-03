@@ -171,8 +171,8 @@ def export_to_obj_with_sidecar(
 
     # Save OBJ via PlantGL, then post-process names.
     scene.save(str(output_obj_path))
-    obj_text = output_obj_path.read_text()
-    output_obj_path.write_text(_rewrite_obj_shape_names(obj_text))
+    obj_text = output_obj_path.read_text(encoding="utf-8")
+    output_obj_path.write_text(_rewrite_obj_shape_names(obj_text), encoding="utf-8")
 
     # Write sidecar
     sidecar_path = output_obj_path.with_suffix(".materials.json")
@@ -185,7 +185,7 @@ def export_to_obj_with_sidecar(
             {"name": e.name, "shape_id": e.shape_id, "material_id": e.material_id}
             for e in entries
         ],
-    }, indent=2))
+    }, indent=2), encoding="utf-8")
 
     return output_obj_path, sidecar_path
 

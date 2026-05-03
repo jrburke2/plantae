@@ -185,5 +185,5 @@ def write(
     out_dir = Path(output_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     path = out_dir / _content_addressed_filename(species, seed_obj)
-    path.write_text(source)
+    path.write_text(source, encoding="utf-8")
     return path

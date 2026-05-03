@@ -96,6 +96,6 @@ class MaterialLibrary(BaseModel):
     def from_json_file(cls, path) -> "MaterialLibrary":
         import json
         from pathlib import Path
-        data = json.loads(Path(path).read_text())
+        data = json.loads(Path(path).read_text(encoding="utf-8"))
         # Top level is a {id: entry-dict} map; wrap as {entries: ...}
         return cls.model_validate({"entries": data})

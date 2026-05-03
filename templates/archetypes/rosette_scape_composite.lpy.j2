@@ -25,7 +25,7 @@ extern(POSITION_Y_M = {{ "%.4f" % render.position_y_m }})
 extern(POSITION_Z_M = {{ "%.4f" % render.position_z_m }})
 
 # === Per-specimen RNG seeded once at file top ===
-# PCG-XSL-RR-128/64 — portable across Python (here) and TypeScript (V2.1+).
+# PCG-XSL-RR-128/64 -- portable across Python (here) and JS (V2.1+).
 rng = seeded_rng(SPECIMEN_SEED)
 
 # === Phenology (median DOY values from species YAML) ===
