@@ -114,7 +114,10 @@ def _emit_derive_case(parent_canonical: str, salts: list[Any]) -> dict[str, Any]
         if isinstance(s, str):
             encoded_salts.append({"type": "str", "value": s})
         elif isinstance(s, int):
-            encoded_salts.append({"type": "int", "value": s})
+            # Always serialize as decimal string. JSON numbers above 2**53
+            # lose precision when parsed by JavaScript's JSON.parse; some
+            # fixture cases (e.g. 2**64-1) exceed that range.
+            encoded_salts.append({"type": "int", "value": str(s)})
         else:
             raise TypeError(f"unsupported salt type {type(s).__name__}")
     return {

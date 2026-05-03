@@ -1425,7 +1425,7 @@
       "salts": [
         {
           "type": "int",
-          "value": 0
+          "value": "0"
         }
       ],
       "child": "RPR3VS9B"
@@ -1444,7 +1444,7 @@
         },
         {
           "type": "int",
-          "value": 0
+          "value": "0"
         }
       ],
       "child": "DRNGQXXR"
@@ -1464,7 +1464,7 @@
       "salts": [
         {
           "type": "int",
-          "value": 42
+          "value": "42"
         }
       ],
       "child": "310MZY3S"
@@ -1502,7 +1502,7 @@
         },
         {
           "type": "int",
-          "value": 0
+          "value": "0"
         }
       ],
       "child": "Q44XQAGX"
@@ -1516,7 +1516,7 @@
         },
         {
           "type": "int",
-          "value": 1
+          "value": "1"
         }
       ],
       "child": "920E8JPF"
@@ -1530,7 +1530,7 @@
         },
         {
           "type": "int",
-          "value": 1000
+          "value": "1000"
         }
       ],
       "child": "4N4QAP3P"
@@ -1544,7 +1544,7 @@
         },
         {
           "type": "int",
-          "value": 4294967295
+          "value": "4294967295"
         }
       ],
       "child": "J9Y3F3DH"
@@ -1558,7 +1558,7 @@
         },
         {
           "type": "int",
-          "value": 0
+          "value": "0"
         }
       ],
       "child": "H6H4Z1W3"
@@ -1572,7 +1572,7 @@
         },
         {
           "type": "int",
-          "value": 5
+          "value": "5"
         }
       ],
       "child": "18Y1CEH1"
@@ -1586,7 +1586,7 @@
         },
         {
           "type": "int",
-          "value": 0
+          "value": "0"
         }
       ],
       "child": "CK75S7MM"
@@ -1660,7 +1660,7 @@
       "salts": [
         {
           "type": "int",
-          "value": 18446744073709551615
+          "value": "18446744073709551615"
         }
       ],
       "child": "KJ6RCTQ7"
@@ -1670,7 +1670,7 @@
       "salts": [
         {
           "type": "int",
-          "value": 4294967296
+          "value": "4294967296"
         }
       ],
       "child": "KGVGWM33"
@@ -1684,7 +1684,7 @@
         },
         {
           "type": "int",
-          "value": 0
+          "value": "0"
         },
         {
           "type": "str",
@@ -1692,7 +1692,7 @@
         },
         {
           "type": "int",
-          "value": 3
+          "value": "3"
         }
       ],
       "child": "1Y6AW9FQ"
@@ -1706,7 +1706,7 @@
         },
         {
           "type": "int",
-          "value": 0
+          "value": "0"
         },
         {
           "type": "str",
@@ -1714,7 +1714,7 @@
         },
         {
           "type": "int",
-          "value": 4
+          "value": "4"
         }
       ],
       "child": "EFYDWPTF"
